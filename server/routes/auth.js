@@ -2,6 +2,7 @@ import express from "express"
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import authMiddleware from "../middlewares/auth.js"
 
 const authRouter = express.Router();
 const JWT_SECRET = "rahasia";
@@ -11,9 +12,9 @@ const JWT_SECRET = "rahasia";
 authRouter.post('/admin/register', async (req, res) => {
     try {
         const { name, email, password, role } = req.body;
-        const userExists = User.findOne({ where: { email } })
+        const userExists = await User.findOne({ where: { email } })
         if (userExists) {
-            res.status(400).json({
+            return res.status(400).json({
                 msg: `User with ${email} already Exists`
             })
         }
@@ -40,14 +41,14 @@ authRouter.post('/admin/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        const user = User.findOne({ where: { email } });
-        if (!user) res.status(400).json({ msg: "User With This Email Doesn\'t Exist" })
+        const user = await User.findOne({ where: { email } });
+        if (!user) return res.status(400).json({ msg: "User With This Email Doesn\'t Exist" })
 
-        const isPasswordValid = bcrypt.compare(password, user.password)
-        if (!isPasswordValid) res.status(400).json({ msg: "Incorrect Password, Try Again!" })
+        const isPasswordValid = await bcrypt.compare(password, user.password)
+        if (!isPasswordValid) return res.status(400).json({ msg: "Incorrect Password, Try Again!" })
 
         const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET)
-        res.json(token, ...user.toJSON())
+        res.json({ token, ...user.toJSON() })
     } catch (e) {
         res.status(500).json({
             error: e.message
@@ -64,7 +65,7 @@ authRouter.post('/IsTokenValid', async (req, res) => {
         if (!tokenVerified) return res.json(false);
 
         const user = await User.findOne({ where: { id: tokenVerified.id } })
-        if(!user) return res.json(false);
+        if (!user) return res.json(false);
 
         res.json(true)
     } catch (e) {
@@ -72,6 +73,17 @@ authRouter.post('/IsTokenValid', async (req, res) => {
             error: e.message,
         })
     }
+})
+
+authRouter.get('/', authMiddleware, async (req, res) => {
+    try {
+        const user = await User.findByPk(req.user)
+        if (!user) return res.status(404).json({ msg: "User not Found" });
+        res.json({ ...user.dataValues, token: req.token });
+    } catch (e) {
+        res.status(500).json({ error: e.message })
+    }
+
 })
 
 export default authRouter;

@@ -28,7 +28,7 @@ const User = sequelize.define(
             allowNull:false,
             validate:{
                 len: {
-                    args: [8,10],
+                    args: [7,255],
                     msg: "Password must be at least 8 character long"
                 },
                 isStrong(value){
