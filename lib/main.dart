@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_cashier_app/common/widgets/custom_loading.dart';
+import 'package:smart_cashier_app/common/widgets/custom_sidebar_home.dart';
 import 'package:smart_cashier_app/constant/global_variables.dart';
 import 'package:smart_cashier_app/module/auth/screens/auth_screen.dart';
 import 'package:smart_cashier_app/module/auth/services/auth_services.dart';
@@ -74,7 +75,7 @@ class _MyAppState extends State<MyApp> {
             ? CustomLoading()
             : Provider.of<UserProvider>(context).user.token.isNotEmpty
                 ? Provider.of<UserProvider>(context).user.role == 'admin'
-                    ? const HomeScreen()
+                    ? const CustomSidebarHome()
                     : const AuthScreen()
                 : const AuthScreen());
   }
