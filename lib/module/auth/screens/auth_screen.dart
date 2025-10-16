@@ -71,46 +71,54 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isWideScreen = MediaQuery.of(context).size.width > 700;
+
     return Scaffold(
       resizeToAvoidBottomInset: true,
       body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Icon
-                Image.asset(
-                  'assets/smarttext.png',
-                  scale: 12,
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18.0),
+              child: Container(
+                height: isWideScreen ? 800 : null,
+                width: isWideScreen ? 500 : null,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Icon
+                    Image.asset(
+                      'assets/smarttext.png',
+                      scale: 12,
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(20, 15, 20, 25),
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(10),
+                        color: GlobalVariables.secondaryColor,
+                      ),
+                      child: _authActive == 1 ? _registerForm() : _loginForm(),
+                    ),
+                    const SizedBox(
+                      height: 10,
+                    ),
+                    ToggleSwitch(
+                      minWidth: double.infinity,
+                      minHeight: 50,
+                      initialLabelIndex: _authActive,
+                      totalSwitches: 2,
+                      labels: const ["Login", "Register"],
+                      onToggle: (index) {
+                        setState(() {
+                          _authActive = index!;
+                        });
+                      },
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 20),
-                Container(
-                  padding: const EdgeInsets.fromLTRB(20, 15, 20, 25),
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    color: GlobalVariables.secondaryColor,
-                  ),
-                  child: _authActive == 1 ? _registerForm() : _loginForm(),
-                ),
-                const SizedBox(
-                  height: 10,
-                ),
-                ToggleSwitch(
-                  minWidth: double.infinity,
-                  minHeight: 50,
-                  initialLabelIndex: _authActive,
-                  totalSwitches: 2,
-                  labels: const ["Login", "Register"],
-                  onToggle: (index) {
-                    setState(() {
-                      _authActive = index!;
-                    });
-                  },
-                ),
-              ],
+              ),
             ),
           ),
           if (isLoading) CustomLoading(),

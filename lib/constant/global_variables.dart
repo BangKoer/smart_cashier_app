@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-String baseUrl = 'http://localhost:3000';
+String baseUrl = 'http://192.168.199.140:3000';
 
 class GlobalVariables {
   // For storing api base url

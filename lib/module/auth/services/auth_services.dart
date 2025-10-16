@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:smart_cashier_app/common/widgets/custom_sidebar_home.dart';
 import 'package:smart_cashier_app/constant/error_handling.dart';
 import 'package:smart_cashier_app/constant/global_variables.dart';
 import 'package:smart_cashier_app/constant/utils.dart';
@@ -80,7 +81,7 @@ class AuthServices {
           // to home screen
           Navigator.pushNamedAndRemoveUntil(
             context,
-            HomeScreen.routeName,
+            CustomSidebarHome.routeName,
             (route) => false,
           );
 

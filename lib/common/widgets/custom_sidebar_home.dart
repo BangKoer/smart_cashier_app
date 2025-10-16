@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:smart_cashier_app/constant/global_variables.dart';
+import 'package:smart_cashier_app/module/cashier/screens/cashier_screen.dart';
 
 class CustomSidebarHome extends StatefulWidget {
+  static const String routeName = 'custom-home';
   const CustomSidebarHome({super.key});
 
   @override
@@ -13,9 +15,7 @@ class _CustomSidebarHomeState extends State<CustomSidebarHome> {
 
   // Pages Content
   List<Widget> pages = [
-    const Center(
-      child: Text('Cashier Page'),
-    ),
+    const CashierScreen(),
     const Center(
       child: Text('Product Page'),
     ),
