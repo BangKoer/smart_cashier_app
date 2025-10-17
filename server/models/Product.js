@@ -1,6 +1,7 @@
 import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database.js";
 import ProductUnit from "./ProductUnit.js"
+import Category from "./category.js";
 
 const Product = sequelize.define(
     "Product",
@@ -12,7 +13,6 @@ const Product = sequelize.define(
         },
         barcode: DataTypes.STRING,
         product_name: DataTypes.STRING,
-        id_category: DataTypes.INTEGER,
         stock: DataTypes.INTEGER,
         purchased_price: DataTypes.FLOAT,
         created_at: {
@@ -31,6 +31,8 @@ const Product = sequelize.define(
 );
 
 Product.hasMany(ProductUnit, { foreignKey : "id_product"})
+Product.belongsTo(Category, {foreignKey: "id_category", as: "category"})
 ProductUnit.belongsTo(Product, {foreignKey : "id_product"})
+
 
 export default Product;

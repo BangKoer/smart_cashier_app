@@ -1,13 +1,20 @@
 import express from "express"
 import Product from "../models/Product.js"
 import ProductUnit from "../models/ProductUnit.js";
+import Category from "../models/category.js";
+import auth from "../middlewares/auth.js";
 
 const productRouter = express.Router();
 
-productRouter.get('/api/products', async (req, res) => {
+productRouter.get('/api/products', auth ,async (req, res) => {
     try {
         const products = await Product.findAll(
-            {include : [{model: ProductUnit}]}
+            { 
+                include: [
+                    { model: ProductUnit },
+                    { model: Category, as: "category", attributes: ["name"]}
+                ]
+            }
         );
         res.json(products);
     } catch (e) {
@@ -17,13 +24,16 @@ productRouter.get('/api/products', async (req, res) => {
     }
 })
 
-productRouter.get('/api/product/:barcode', async (req, res) => {
+productRouter.get('/api/product/:barcode', auth ,async (req, res) => {
     try {
         const { barcode } = req.params;
         const products = await Product.findOne(
             {
                 where: { barcode },
-                include: [{model: ProductUnit}]
+                include: [
+                    { model: ProductUnit },
+                    { model: Category, as: "category", attributes: ["name"]}
+                ]
             }
         );
 

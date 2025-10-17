@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:smart_cashier_app/constant/global_variables.dart';
+import 'package:smart_cashier_app/models/cart.dart';
+import 'package:smart_cashier_app/models/product.dart';
+import 'package:smart_cashier_app/models/product_unit.dart';
+import 'package:smart_cashier_app/module/cashier/services/cashier_services.dart';
+import 'package:collection/collection.dart';
 
 class CashierScreen extends StatefulWidget {
   const CashierScreen({super.key});
@@ -12,11 +17,60 @@ class CashierScreen extends StatefulWidget {
 class _CashierScreenState extends State<CashierScreen> {
   final TextEditingController _barcodeController = TextEditingController();
   final TextEditingController _qtyController = TextEditingController();
+  final CashierServices cashierServices = CashierServices();
+  double get totalPrice => cartItems.fold(0, (sum, item) => sum + item.total);
+  int get totalProduct => cartItems.fold(0, (sum, item) => sum + item.qty);
+  List<CartItem> cartItems = [];
 
   String toRupiah(dynamic amount) {
     final rupiahFormatter =
         NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
     return rupiahFormatter.format(amount);
+  }
+
+  getProductByBarcode(String barcode) async {
+    // 1️⃣ Cek dulu apakah produk sudah ada di cart
+    final existingItem = cartItems.firstWhereOrNull(
+      (item) => item.product.barcode == barcode,
+    );
+
+    // 2️⃣ Kalau sudah ada → tambah qty aja
+    if (existingItem != null) {
+      setState(() {
+        existingItem.qty += 1;
+        _barcodeController.clear();
+        _qtyController.clear();
+      });
+      return;
+    }
+
+    Product? productFetch = await cashierServices.fetchProductByBarcode(
+        context: context, barcode: barcode);
+    if (productFetch != null) {
+      setState(() {
+        cartItems.add(
+          CartItem(
+            qty: _qtyController.text.isNotEmpty
+                ? int.parse(_qtyController.text)
+                : 1,
+            product: productFetch,
+            selectedUnit: productFetch.productUnits.isNotEmpty
+                ? productFetch.productUnits.first
+                : null,
+          ),
+        );
+      });
+
+      _barcodeController.clear();
+      _qtyController.clear();
+    }
+  }
+
+  @override
+  void dispose() {
+    _barcodeController.dispose();
+    _qtyController.dispose();
+    super.dispose();
   }
 
   @override
@@ -33,12 +87,12 @@ class _CashierScreenState extends State<CashierScreen> {
               children: [
                 CustomTextWidget(
                   title: "Total Price\n",
-                  amount: toRupiah(10000),
+                  amount: toRupiah(totalPrice),
                 ),
                 const SizedBox(height: 8),
                 CustomTextWidget(
-                  title: "Total Price\n",
-                  amount: toRupiah(10000),
+                  title: "Total Product\n",
+                  amount: "$totalProduct products",
                 ),
                 const SizedBox(height: 16),
               ],
@@ -97,6 +151,7 @@ class _CashierScreenState extends State<CashierScreen> {
             Expanded(
               flex: 3,
               child: TextField(
+                controller: _barcodeController,
                 decoration: const InputDecoration(
                   labelText: "Scan / Input Barcode",
                   border: OutlineInputBorder(),
@@ -107,6 +162,7 @@ class _CashierScreenState extends State<CashierScreen> {
             Expanded(
               flex: 1,
               child: TextField(
+                controller: _qtyController,
                 decoration: const InputDecoration(
                   labelText: "Qty",
                   border: OutlineInputBorder(),
@@ -116,7 +172,7 @@ class _CashierScreenState extends State<CashierScreen> {
             ),
             const SizedBox(width: 8),
             ElevatedButton(
-              onPressed: () {},
+              onPressed: () => getProductByBarcode(_barcodeController.text),
               child: const Text("Tambah"),
             ),
           ],
@@ -157,17 +213,70 @@ class _CashierScreenState extends State<CashierScreen> {
                 DataColumn(label: Text("Qty")),
                 DataColumn(label: Text("Satuan")),
                 DataColumn(label: Text("Harga")),
+                DataColumn(label: Text("Total")),
               ],
-              rows: List.generate(
-                10,
-                (index) => DataRow(cells: [
-                  DataCell(Text('${index + 1}')),
-                  DataCell(Text('Produk ${index + 1}')),
-                  const DataCell(Text('2')),
-                  const DataCell(Text('pcs')),
-                  DataCell(Text(toRupiah(10000))),
-                ]),
-              ),
+              rows: cartItems.isEmpty
+                  ? [
+                      const DataRow(cells: [
+                        DataCell(Text('-')),
+                        DataCell(Text('Belum ada data')),
+                        DataCell(Text('-')),
+                        DataCell(Text('-')),
+                        DataCell(Text('-')),
+                        DataCell(Text('-')),
+                      ]),
+                    ]
+                  : List.generate(
+                      cartItems.length,
+                      (index) {
+                        final item = cartItems[index];
+                        return DataRow(cells: [
+                          DataCell(Text('${index + 1}')),
+                          DataCell(Text(item.product.productName)),
+                          // Input qty
+                          DataCell(
+                            SizedBox(
+                              width: 50,
+                              child: TextField(
+                                keyboardType: TextInputType.number,
+                                decoration: const InputDecoration(
+                                    border: InputBorder.none),
+                                controller: TextEditingController(
+                                  text: item.qty.toString(),
+                                ),
+                                onChanged: (val) {
+                                  setState(() {
+                                    item.qty = int.tryParse(val) ?? 1;
+                                  });
+                                },
+                              ),
+                            ),
+                          ),
+                          // 🧩 Dropdown satuan (ProductUnit)
+                          DataCell(
+                            DropdownButton<ProductUnit>(
+                              value: item.selectedUnit,
+                              items: item.product.productUnits
+                                  .map(
+                                    (unit) => DropdownMenuItem(
+                                      value: unit,
+                                      child: Text(unit.nameUnit),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (unit) {
+                                setState(() {
+                                  item.selectedUnit = unit;
+                                });
+                              },
+                            ),
+                          ),
+                          DataCell(
+                              Text(toRupiah(item.selectedUnit?.price ?? 0))),
+                          DataCell(Text(toRupiah(item.total))),
+                        ]);
+                      },
+                    ),
             ),
           ),
         ),

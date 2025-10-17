@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:smart_cashier_app/constant/global_variables.dart';
 import 'package:smart_cashier_app/module/cashier/screens/cashier_screen.dart';
+import 'package:smart_cashier_app/providers/user_provider.dart';
 
 class CustomSidebarHome extends StatefulWidget {
   static const String routeName = 'custom-home';
@@ -26,6 +28,9 @@ class _CustomSidebarHomeState extends State<CustomSidebarHome> {
 
   @override
   Widget build(BuildContext context) {
+    String token = Provider.of<UserProvider>(context).user.token;
+    print("token : $token");
+
     final bool isWideScreen = MediaQuery.of(context).size.width >= 700;
 
     Widget drawerContent = Drawer(
