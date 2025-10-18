@@ -11,7 +11,7 @@ productRouter.get('/api/products', auth ,async (req, res) => {
         const products = await Product.findAll(
             { 
                 include: [
-                    { model: ProductUnit },
+                    { model: ProductUnit, as: "units" },
                     { model: Category, as: "category", attributes: ["name"]}
                 ]
             }
@@ -31,7 +31,7 @@ productRouter.get('/api/product/:barcode', auth ,async (req, res) => {
             {
                 where: { barcode },
                 include: [
-                    { model: ProductUnit },
+                    { model: ProductUnit, as: "units" },
                     { model: Category, as: "category", attributes: ["name"]}
                 ]
             }
@@ -50,5 +50,15 @@ productRouter.get('/api/product/:barcode', auth ,async (req, res) => {
         })
     }
 });
+
+productRouter.post('api/product/add-sales', auth, async (req, res) => {
+    try {
+        
+    } catch (e) {
+        res.status(500).json({
+            error: e.message
+        })
+    }
+})
 
 export default productRouter;

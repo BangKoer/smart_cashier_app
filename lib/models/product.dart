@@ -10,7 +10,7 @@ class Product {
   final int stock;
   final double purchasedPrice;
   final int idCategory;
-  final List<ProductUnit> productUnits;
+  final List<ProductUnit> units;
   final Category category;
 
   Product(
@@ -20,7 +20,7 @@ class Product {
       required this.stock,
       required this.purchasedPrice,
       required this.idCategory,
-      required this.productUnits,
+      required this.units,
       required this.category});
 
   Map<String, dynamic> toMap() {
@@ -31,7 +31,7 @@ class Product {
       'stock': stock,
       'purchasedPrice': purchasedPrice,
       'idCategory': idCategory,
-      'productUnits': productUnits.map((x) => x.toMap()).toList(),
+      'units': units.map((x) => x.toMap()).toList(),
       'category': category.toMap(),
     };
   }
@@ -44,7 +44,7 @@ class Product {
       stock: map['stock'] ?? 0,
       purchasedPrice: double.tryParse(map['purchased_price'].toString()) ?? 0.0,
       idCategory: map['id_category'] ?? 0,
-      productUnits: (map['ProductUnits'] as List<dynamic>?)
+      units: (map['units'] as List<dynamic>?)
               ?.map((u) => ProductUnit.fromMap(u))
               .toList() ??
           [],

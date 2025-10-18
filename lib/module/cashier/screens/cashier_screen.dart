@@ -29,12 +29,10 @@ class _CashierScreenState extends State<CashierScreen> {
   }
 
   getProductByBarcode(String barcode) async {
-    // 1️⃣ Cek dulu apakah produk sudah ada di cart
     final existingItem = cartItems.firstWhereOrNull(
       (item) => item.product.barcode == barcode,
     );
 
-    // 2️⃣ Kalau sudah ada → tambah qty aja
     if (existingItem != null) {
       setState(() {
         existingItem.qty += 1;
@@ -54,8 +52,8 @@ class _CashierScreenState extends State<CashierScreen> {
                 ? int.parse(_qtyController.text)
                 : 1,
             product: productFetch,
-            selectedUnit: productFetch.productUnits.isNotEmpty
-                ? productFetch.productUnits.first
+            selectedUnit: productFetch.units.isNotEmpty
+                ? productFetch.units.first
                 : null,
           ),
         );
@@ -256,7 +254,7 @@ class _CashierScreenState extends State<CashierScreen> {
                           DataCell(
                             DropdownButton<ProductUnit>(
                               value: item.selectedUnit,
-                              items: item.product.productUnits
+                              items: item.product.units
                                   .map(
                                     (unit) => DropdownMenuItem(
                                       value: unit,
