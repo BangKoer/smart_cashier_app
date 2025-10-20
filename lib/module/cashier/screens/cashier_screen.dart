@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:smart_cashier_app/common/widgets/custom_loading.dart';
 import 'package:smart_cashier_app/constant/global_variables.dart';
+import 'package:smart_cashier_app/constant/utils.dart';
 import 'package:smart_cashier_app/models/cart.dart';
 import 'package:smart_cashier_app/models/product.dart';
 import 'package:smart_cashier_app/models/product_unit.dart';
+import 'package:smart_cashier_app/models/user.dart';
 import 'package:smart_cashier_app/module/cashier/services/cashier_services.dart';
 import 'package:collection/collection.dart';
+import 'package:smart_cashier_app/providers/user_provider.dart';
 
 class CashierScreen extends StatefulWidget {
   const CashierScreen({super.key});
@@ -18,6 +23,9 @@ class _CashierScreenState extends State<CashierScreen> {
   final TextEditingController _barcodeController = TextEditingController();
   final TextEditingController _qtyController = TextEditingController();
   final CashierServices cashierServices = CashierServices();
+  User? userProvider;
+  bool isLoading = false;
+
   double get totalPrice => cartItems.fold(0, (sum, item) => sum + item.total);
   int get totalProduct => cartItems.fold(0, (sum, item) => sum + item.qty);
   List<CartItem> cartItems = [];
@@ -29,38 +37,114 @@ class _CashierScreenState extends State<CashierScreen> {
   }
 
   getProductByBarcode(String barcode) async {
-    final existingItem = cartItems.firstWhereOrNull(
-      (item) => item.product.barcode == barcode,
-    );
-
-    if (existingItem != null) {
-      setState(() {
-        existingItem.qty += 1;
-        _barcodeController.clear();
-        _qtyController.clear();
-      });
-      return;
-    }
-
-    Product? productFetch = await cashierServices.fetchProductByBarcode(
-        context: context, barcode: barcode);
-    if (productFetch != null) {
-      setState(() {
-        cartItems.add(
-          CartItem(
-            qty: _qtyController.text.isNotEmpty
-                ? int.parse(_qtyController.text)
-                : 1,
-            product: productFetch,
-            selectedUnit: productFetch.units.isNotEmpty
-                ? productFetch.units.first
-                : null,
-          ),
-        );
-      });
-
+    try {
+      Product? productFetch = await cashierServices.fetchProductByBarcode(
+          context: context, barcode: barcode);
+      if (productFetch != null) {
+        _addCartItem(productFetch, barcode);
+      }
+    } catch (e) {
+      debugPrint('Error fetching product by barcode: $e');
+    } finally {
       _barcodeController.clear();
       _qtyController.clear();
+    }
+  }
+
+  void _addCartItem(Product product, String barcode) {
+    setState(
+      () {
+        final existingItem = cartItems.firstWhereOrNull(
+          (item) => item.product.barcode == barcode,
+        );
+
+        if (existingItem != null) {
+          existingItem.qty += 1;
+        } else {
+          cartItems.add(CartItem(
+            product: product,
+            qty: 1,
+            selectedUnit: product.units.first,
+          ));
+        }
+      },
+    );
+  }
+
+  void _showProductsDialog() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const CustomLoading(),
+    );
+
+    try {
+      List<Product?> products =
+          await cashierServices.fetchAllProducts(context: context);
+      Navigator.pop(context);
+
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            backgroundColor: GlobalVariables.backgroundColor,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: const Text("Select Product"),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.vertical,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: DataTable(
+                    columns: const [
+                      DataColumn(label: Text("No")),
+                      DataColumn(label: Text("Barcode")),
+                      DataColumn(label: Text("Nama Barang")),
+                    ],
+                    rows: List.generate(
+                      products.length,
+                      (index) {
+                        final productSingle = products[index];
+                        return DataRow(
+                          cells: [
+                            DataCell(Text('${index + 1}')),
+                            DataCell(
+                              InkWell(
+                                onDoubleTap: () {
+                                  _addCartItem(
+                                      productSingle, productSingle.barcode);
+
+                                  Navigator.pop(context);
+                                },
+                                child: Text(productSingle!.barcode),
+                              ),
+                            ),
+                            DataCell(
+                              InkWell(
+                                onDoubleTap: () {
+                                  _addCartItem(
+                                      productSingle, productSingle.barcode);
+                                  Navigator.pop(context);
+                                },
+                                child: Text(productSingle.productName),
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      Navigator.pop(context);
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
     }
   }
 
@@ -73,7 +157,25 @@ class _CashierScreenState extends State<CashierScreen> {
 
   @override
   Widget build(BuildContext context) {
+    userProvider = Provider.of<UserProvider>(context).user;
+    bool isWideScreen = MediaQuery.of(context).size.width > 800;
     return Scaffold(
+      floatingActionButton: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          adaptiveFab(
+            isWideScreen: isWideScreen,
+            onPressed: _showProductsDialog,
+            icon: Icons.add_shopping_cart_rounded,
+          ),
+          const SizedBox(width: 10),
+          adaptiveFab(
+            isWideScreen: isWideScreen,
+            onPressed: () {},
+            icon: Icons.qr_code,
+          ),
+        ],
+      ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -177,8 +279,6 @@ class _CashierScreenState extends State<CashierScreen> {
         ),
         const SizedBox(height: 20),
         const Divider(),
-        Text("Total: Rp100.000",
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
         ElevatedButton.icon(
           onPressed: () {},
@@ -192,6 +292,16 @@ class _CashierScreenState extends State<CashierScreen> {
         ),
       ],
     );
+  }
+
+  Widget adaptiveFab({
+    required bool isWideScreen,
+    required VoidCallback onPressed,
+    required IconData icon,
+  }) {
+    return isWideScreen
+        ? FloatingActionButton.large(onPressed: onPressed, child: Icon(icon))
+        : FloatingActionButton(onPressed: onPressed, child: Icon(icon));
   }
 
   Widget _buildTableSection(BuildContext context) {
@@ -212,12 +322,14 @@ class _CashierScreenState extends State<CashierScreen> {
                 DataColumn(label: Text("Satuan")),
                 DataColumn(label: Text("Harga")),
                 DataColumn(label: Text("Total")),
+                DataColumn(label: Text("Delete Action")),
               ],
               rows: cartItems.isEmpty
                   ? [
                       const DataRow(cells: [
                         DataCell(Text('-')),
                         DataCell(Text('Belum ada data')),
+                        DataCell(Text('-')),
                         DataCell(Text('-')),
                         DataCell(Text('-')),
                         DataCell(Text('-')),
@@ -238,13 +350,14 @@ class _CashierScreenState extends State<CashierScreen> {
                               child: TextField(
                                 keyboardType: TextInputType.number,
                                 decoration: const InputDecoration(
-                                    border: InputBorder.none),
+                                  border: InputBorder.none,
+                                ),
                                 controller: TextEditingController(
                                   text: item.qty.toString(),
                                 ),
-                                onChanged: (val) {
+                                onSubmitted: (val) {
                                   setState(() {
-                                    item.qty = int.tryParse(val) ?? 1;
+                                    item.qty = int.tryParse(val) ?? 0;
                                   });
                                 },
                               ),
@@ -272,6 +385,14 @@ class _CashierScreenState extends State<CashierScreen> {
                           DataCell(
                               Text(toRupiah(item.selectedUnit?.price ?? 0))),
                           DataCell(Text(toRupiah(item.total))),
+                          DataCell(
+                            IconButton(
+                                onPressed: () {},
+                                icon: Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                )),
+                          ),
                         ]);
                       },
                     ),

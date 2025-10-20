@@ -10,6 +10,39 @@ import 'package:http/http.dart' as http;
 import 'package:smart_cashier_app/providers/user_provider.dart';
 
 class CashierServices {
+  Future<void> postSales({required List<Product> cartItems}) async {
+    for (var i = 0; i < cartItems.length; i++) {}
+  }
+
+  Future<List<Product?>> fetchAllProducts(
+      {required BuildContext context}) async {
+    List<Product> list_product = [];
+    final userProvider = Provider.of<UserProvider>(context, listen: false).user;
+    try {
+      http.Response res =
+          await http.get(Uri.parse('$baseUrl/api/products'), headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
+        'x-auth-token': userProvider.token,
+      });
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          final resDecode = jsonDecode(res.body);
+          list_product = List<Product>.from(
+            (resDecode as List).map(
+              (item) => Product.fromMap(item as Map<String, dynamic>),
+            ),
+          );
+        },
+      );
+      return list_product;
+    } catch (e) {
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
+    }
+    return list_product;
+  }
+
   Future<Product?> fetchProductByBarcode({
     required BuildContext context,
     required String barcode,
@@ -22,12 +55,16 @@ class CashierServices {
         'Content-Type': 'application/json; charset=UTF-8',
         'x-auth-token': userProvider.token,
       });
-      httpErrorhandle(response: res, context: context, onSuccess: () {
-        final resDecoded = json.decode(res.body); 
-        product =  Product.fromMap(resDecoded);
-      },);
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          final resDecoded = json.decode(res.body);
+          product = Product.fromMap(resDecoded);
+        },
+      );
       return product;
-    } catch (e) { 
+    } catch (e) {
       showSnackBar(
         context,
         bgColor: Colors.red,

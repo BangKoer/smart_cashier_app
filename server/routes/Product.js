@@ -51,14 +51,4 @@ productRouter.get('/api/product/:barcode', auth ,async (req, res) => {
     }
 });
 
-productRouter.post('api/product/add-sales', auth, async (req, res) => {
-    try {
-        
-    } catch (e) {
-        res.status(500).json({
-            error: e.message
-        })
-    }
-})
-
 export default productRouter;
