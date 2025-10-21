@@ -43,6 +43,7 @@ dependencies:
   sidebarx: ^0.17.2
   intl: ^0.20.2
   collection: ^1.18.0
+  data_table_2: ^2.5.18
 
 dev_dependencies:
   flutter_test:

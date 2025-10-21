@@ -28,8 +28,8 @@ class _CustomSidebarHomeState extends State<CustomSidebarHome> {
 
   @override
   Widget build(BuildContext context) {
-    String token = Provider.of<UserProvider>(context).user.token;
-    print("token : $token");
+    // String token = Provider.of<UserProvider>(context).user.token;
+    // print("token : $token");
 
     final bool isWideScreen = MediaQuery.of(context).size.width >= 700;
 

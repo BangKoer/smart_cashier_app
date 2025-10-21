@@ -22,11 +22,13 @@ class CashierScreen extends StatefulWidget {
 class _CashierScreenState extends State<CashierScreen> {
   final TextEditingController _barcodeController = TextEditingController();
   final TextEditingController _qtyController = TextEditingController();
+  final TextEditingController _exchangeController = TextEditingController();
   final CashierServices cashierServices = CashierServices();
+
   User? userProvider;
-  bool isLoading = false;
 
   double get totalPrice => cartItems.fold(0, (sum, item) => sum + item.total);
+  double exchange = 0.0;
   int get totalProduct => cartItems.fold(0, (sum, item) => sum + item.qty);
   List<CartItem> cartItems = [];
 
@@ -36,12 +38,12 @@ class _CashierScreenState extends State<CashierScreen> {
     return rupiahFormatter.format(amount);
   }
 
-  getProductByBarcode(String barcode) async {
+  getProductByBarcode(String barcode, {int qty = 1}) async {
     try {
       Product? productFetch = await cashierServices.fetchProductByBarcode(
           context: context, barcode: barcode);
       if (productFetch != null) {
-        _addCartItem(productFetch, barcode);
+        _addCartItem(productFetch, barcode, qty: qty);
       }
     } catch (e) {
       debugPrint('Error fetching product by barcode: $e');
@@ -51,7 +53,7 @@ class _CashierScreenState extends State<CashierScreen> {
     }
   }
 
-  void _addCartItem(Product product, String barcode) {
+  void _addCartItem(Product product, String barcode, {int qty = 1}) {
     setState(
       () {
         final existingItem = cartItems.firstWhereOrNull(
@@ -59,11 +61,11 @@ class _CashierScreenState extends State<CashierScreen> {
         );
 
         if (existingItem != null) {
-          existingItem.qty += 1;
+          existingItem.qty += qty;
         } else {
           cartItems.add(CartItem(
             product: product,
-            qty: 1,
+            qty: qty,
             selectedUnit: product.units.first,
           ));
         }
@@ -86,57 +88,71 @@ class _CashierScreenState extends State<CashierScreen> {
       showDialog(
         context: context,
         builder: (context) {
-          return AlertDialog(
+          return Dialog(
+            insetPadding: const EdgeInsets.all(20),
             backgroundColor: GlobalVariables.backgroundColor,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            title: const Text("Select Product"),
-            content: SizedBox(
-              width: double.maxFinite,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.vertical,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    columns: const [
-                      DataColumn(label: Text("No")),
-                      DataColumn(label: Text("Barcode")),
-                      DataColumn(label: Text("Nama Barang")),
-                    ],
-                    rows: List.generate(
-                      products.length,
-                      (index) {
-                        final productSingle = products[index];
-                        return DataRow(
-                          cells: [
-                            DataCell(Text('${index + 1}')),
-                            DataCell(
-                              InkWell(
-                                onDoubleTap: () {
-                                  _addCartItem(
-                                      productSingle, productSingle.barcode);
-
-                                  Navigator.pop(context);
-                                },
-                                child: Text(productSingle!.barcode),
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.7,
+              height: MediaQuery.of(context).size.height * 0.7,
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Select Product",
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        return SingleChildScrollView(
+                          scrollDirection: Axis.vertical,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: SizedBox(
+                              width: constraints
+                                  .maxWidth, // 💡 Biar tabel ikut selebar dialog
+                              child: DataTable(
+                                headingRowColor: WidgetStateProperty.all(
+                                    GlobalVariables.thirdColor),
+                                columns: const [
+                                  DataColumn(label: Text("Barcode")),
+                                  DataColumn(label: Text("Nama Barang")),
+                                ],
+                                rows: List.generate(products.length, (index) {
+                                  final product = products[index];
+                                  return DataRow(
+                                    cells: [
+                                      DataCell(
+                                        onTap: () {
+                                          _addCartItem(
+                                              product, product.barcode);
+                                          Navigator.pop(context);
+                                        },
+                                        Text(product!.barcode),
+                                      ),
+                                      DataCell(
+                                        onTap: () {
+                                          _addCartItem(
+                                              product, product.barcode);
+                                          Navigator.pop(context);
+                                        },
+                                        Text(product.productName),
+                                      ),
+                                    ],
+                                  );
+                                }),
                               ),
                             ),
-                            DataCell(
-                              InkWell(
-                                onDoubleTap: () {
-                                  _addCartItem(
-                                      productSingle, productSingle.barcode);
-                                  Navigator.pop(context);
-                                },
-                                child: Text(productSingle.productName),
-                              ),
-                            ),
-                          ],
+                          ),
                         );
                       },
                     ),
-                  ),
-                ),
+                  )
+                ],
               ),
             ),
           );
@@ -181,7 +197,7 @@ class _CashierScreenState extends State<CashierScreen> {
         children: [
           // ✅ BAGIAN HEADER (STAY)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 18),
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 50),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -189,10 +205,10 @@ class _CashierScreenState extends State<CashierScreen> {
                   title: "Total Price\n",
                   amount: toRupiah(totalPrice),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 18),
                 CustomTextWidget(
-                  title: "Total Product\n",
-                  amount: "$totalProduct products",
+                  title: "Exchange\n",
+                  amount: toRupiah(exchange),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -244,7 +260,8 @@ class _CashierScreenState extends State<CashierScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Input Barang", style: Theme.of(context).textTheme.titleLarge),
+        Text("Input Item & Payment",
+            style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 8),
         Row(
           children: [
@@ -252,6 +269,8 @@ class _CashierScreenState extends State<CashierScreen> {
               flex: 3,
               child: TextField(
                 controller: _barcodeController,
+                onSubmitted: (_) =>
+                    getProductByBarcode(_barcodeController.text),
                 decoration: const InputDecoration(
                   labelText: "Scan / Input Barcode",
                   border: OutlineInputBorder(),
@@ -272,10 +291,32 @@ class _CashierScreenState extends State<CashierScreen> {
             ),
             const SizedBox(width: 8),
             ElevatedButton(
-              onPressed: () => getProductByBarcode(_barcodeController.text),
-              child: const Text("Tambah"),
+              onPressed: () => getProductByBarcode(_barcodeController.text,
+                  qty: int.parse(_qtyController.text)),
+              child: const Text("Add"),
+              style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                foregroundColor: Colors.white,
+              ),
             ),
           ],
+        ),
+        const SizedBox(height: 20),
+        TextField(
+          controller: _exchangeController,
+          onChanged: (value) {
+            setState(() {
+              exchange = -(totalPrice - double.parse(value));
+            });
+          },
+          onSubmitted: (_) => getProductByBarcode(_barcodeController.text),
+          decoration: const InputDecoration(
+            labelText: "Payment Amount",
+            border: OutlineInputBorder(),
+          ),
+          keyboardType: TextInputType.number,
         ),
         const SizedBox(height: 20),
         const Divider(),
@@ -285,6 +326,9 @@ class _CashierScreenState extends State<CashierScreen> {
           icon: const Icon(Icons.payment),
           label: const Text("Bayar"),
           style: ElevatedButton.styleFrom(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(5),
+            ),
             backgroundColor: Colors.green,
             foregroundColor: Colors.white,
             minimumSize: const Size(double.infinity, 50),
@@ -387,7 +431,11 @@ class _CashierScreenState extends State<CashierScreen> {
                           DataCell(Text(toRupiah(item.total))),
                           DataCell(
                             IconButton(
-                                onPressed: () {},
+                                onPressed: () {
+                                  setState(() {
+                                    cartItems.removeAt(index);
+                                  });
+                                },
                                 icon: Icon(
                                   Icons.delete,
                                   color: Colors.red,
