@@ -24,11 +24,14 @@ class _CashierScreenState extends State<CashierScreen> {
   final TextEditingController _qtyController = TextEditingController();
   final TextEditingController _exchangeController = TextEditingController();
   final CashierServices cashierServices = CashierServices();
+  final TextEditingController _customerNameController = TextEditingController();
 
   User? userProvider;
 
   double get totalPrice => cartItems.fold(0, (sum, item) => sum + item.total);
   double exchange = 0.0;
+  String paymentMethod = 'cash'; // default
+  String paymentStatus = 'paid'; // default
   int get totalProduct => cartItems.fold(0, (sum, item) => sum + item.qty);
   List<CartItem> cartItems = [];
 
@@ -36,6 +39,21 @@ class _CashierScreenState extends State<CashierScreen> {
     final rupiahFormatter =
         NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
     return rupiahFormatter.format(amount);
+  }
+
+  createSales() async {
+    await cashierServices.createSales(
+      context: context,
+      cartItems: cartItems,
+      totalPrice: totalPrice,
+      paymentMethod: paymentMethod,
+      paymentStatus: paymentStatus,
+      customerName: _customerNameController.text,
+    );
+    setState(() {
+      cartItems.clear();
+      _exchangeController.clear();
+    });
   }
 
   getProductByBarcode(String barcode, {int qty = 1}) async {
@@ -69,6 +87,139 @@ class _CashierScreenState extends State<CashierScreen> {
             selectedUnit: product.units.first,
           ));
         }
+      },
+    );
+  }
+
+  void _showConfirmsPayDialog() async {
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+            insetPadding: const EdgeInsets.all(20),
+            backgroundColor: GlobalVariables.backgroundColor,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: Text(
+              "Confirm Payment",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            content: StatefulBuilder(
+              builder: (context, setState) {
+                if (isLoading) {
+                  return SizedBox(
+                    width: MediaQuery.of(context).size.width * 0.4,
+                    height: MediaQuery.of(context).size.height * 0.5,
+                    child: const Center(
+                      child: CustomLoading(), // widget loading kamu
+                    ),
+                  );
+                }
+                return Container(
+                  width: MediaQuery.of(context).size.width * 0.4,
+                  height: MediaQuery.of(context).size.height * 0.5,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Total Price: ${toRupiah(totalPrice)}",
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 18),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        "Exchange: ${toRupiah(exchange)}",
+                        style: const TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 18),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Customer name
+                      TextField(
+                        controller: _customerNameController,
+                        decoration: const InputDecoration(
+                          labelText: "Nama Customer (optional)",
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Payment method dropdown
+                      DropdownButtonFormField<String>(
+                        value: paymentMethod,
+                        decoration: const InputDecoration(
+                          labelText: "Metode Pembayaran",
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'cash', child: Text('Cash')),
+                          DropdownMenuItem(value: 'qris', child: Text('QRIS')),
+                        ],
+                        onChanged: (val) {
+                          setState(() {
+                            paymentMethod = val!;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Payment status dropdown
+                      DropdownButtonFormField<String>(
+                        value: paymentStatus,
+                        decoration: const InputDecoration(
+                          labelText: "Status Pembayaran",
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'paid', child: Text('Paid')),
+                          DropdownMenuItem(
+                              value: 'pending', child: Text('Pending')),
+                        ],
+                        onChanged: (val) {
+                          setState(() {
+                            paymentStatus = val!;
+                          });
+                        },
+                      ),
+
+                      const Spacer(),
+
+                      // Confirm & Cancel Buttons
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text("Batal"),
+                            style: ElevatedButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(5)),
+                            ),
+                          ),
+                          ElevatedButton(
+                            onPressed: () async {
+                              setState(() => isLoading = true);
+                              await createSales();
+                              setState(() => isLoading = false);
+                              Navigator.pop(context); // tutup dialog dulu
+                            },
+                            style: ElevatedButton.styleFrom(
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(5)),
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text("Konfirmasi"),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ));
       },
     );
   }
@@ -168,6 +319,7 @@ class _CashierScreenState extends State<CashierScreen> {
   void dispose() {
     _barcodeController.dispose();
     _qtyController.dispose();
+    _exchangeController.dispose();
     super.dispose();
   }
 
@@ -293,13 +445,13 @@ class _CashierScreenState extends State<CashierScreen> {
             ElevatedButton(
               onPressed: () => getProductByBarcode(_barcodeController.text,
                   qty: int.parse(_qtyController.text)),
-              child: const Text("Add"),
               style: ElevatedButton.styleFrom(
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(5),
                 ),
                 foregroundColor: Colors.white,
               ),
+              child: const Text("Add"),
             ),
           ],
         ),
@@ -313,7 +465,7 @@ class _CashierScreenState extends State<CashierScreen> {
           },
           onSubmitted: (_) => getProductByBarcode(_barcodeController.text),
           decoration: const InputDecoration(
-            labelText: "Payment Amount",
+            labelText: "Pay Amount",
             border: OutlineInputBorder(),
           ),
           keyboardType: TextInputType.number,
@@ -322,9 +474,9 @@ class _CashierScreenState extends State<CashierScreen> {
         const Divider(),
         const SizedBox(height: 10),
         ElevatedButton.icon(
-          onPressed: () {},
+          onPressed: _showConfirmsPayDialog,
           icon: const Icon(Icons.payment),
-          label: const Text("Bayar"),
+          label: const Text("Pay"),
           style: ElevatedButton.styleFrom(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(5),
@@ -436,7 +588,7 @@ class _CashierScreenState extends State<CashierScreen> {
                                     cartItems.removeAt(index);
                                   });
                                 },
-                                icon: Icon(
+                                icon: const Icon(
                                   Icons.delete,
                                   color: Colors.red,
                                 )),

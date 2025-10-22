@@ -5,13 +5,71 @@ import 'package:provider/provider.dart';
 import 'package:smart_cashier_app/constant/error_handling.dart';
 import 'package:smart_cashier_app/constant/global_variables.dart';
 import 'package:smart_cashier_app/constant/utils.dart';
+import 'package:smart_cashier_app/models/cart.dart';
 import 'package:smart_cashier_app/models/product.dart';
 import 'package:http/http.dart' as http;
 import 'package:smart_cashier_app/providers/user_provider.dart';
 
 class CashierServices {
-  Future<void> postSales({required List<Product> cartItems}) async {
-    for (var i = 0; i < cartItems.length; i++) {}
+  Future<void> createSales({
+    required BuildContext context,
+    required List<CartItem> cartItems,
+    required double totalPrice,
+    required String paymentMethod,
+    required String paymentStatus,
+    required String customerName,
+  }) async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false);
+    try {
+      // Ubah item dalam CartItem jadi bentuk yang bisa di POST Ke Backend
+      final List<Map<String, dynamic>> items = cartItems.map(
+        (item) {
+          return {
+            "id_product": item.product.id,
+            "id_product_unit": item.selectedUnit?.id ?? 1,
+            "quantity": item.qty,
+            "sub_total": item.total,
+          };
+        },
+      ).toList();
+
+      final Map<String, dynamic> bodyPost = {
+        "id_user": userProvider.user.id, // atau sesuai field usermu
+        "total_price": totalPrice,
+        "payment_method": paymentMethod,
+        "payment_status": paymentStatus,
+        "customer_name": customerName,
+        "items": items,
+      };
+
+      http.Response res = await http.post(
+        Uri.parse('$baseUrl/api/sales'),
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'x-auth-token': userProvider.user.token,
+        },
+        body: jsonEncode(bodyPost),
+      );
+
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          showSnackBar(
+            context,
+            bgColor: Colors.green,
+            "Sales has been Recorded. Thank You For Purchasing",
+          );
+        },
+      );
+    } catch (e) {
+      debugPrint(e.toString());
+      showSnackBar(
+        context,
+        bgColor: Colors.red,
+        e.toString(),
+      );
+    }
   }
 
   Future<List<Product?>> fetchAllProducts(

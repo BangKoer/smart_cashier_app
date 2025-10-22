@@ -5,6 +5,7 @@ import sequelize from "./database.js";
 // Import Routers
 import productRouter from "./routes/Product.js";
 import authRouter from "./routes/auth.js";
+import salesRouter from "./routes/Sales.js"
 import "./models/relations.js"
 
 const app = express();
@@ -14,7 +15,8 @@ app.use(express.json());
 
 // Connect Routes
 app.use(productRouter);
-app.use(authRouter)
+app.use(authRouter);
+app.use(salesRouter);
 
 // DB connection Test
 sequelize.authenticate()
