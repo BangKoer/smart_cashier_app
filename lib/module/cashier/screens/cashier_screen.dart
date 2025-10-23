@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_cashier_app/common/widgets/custom_loading.dart';
 import 'package:smart_cashier_app/constant/global_variables.dart';
@@ -10,7 +9,9 @@ import 'package:smart_cashier_app/models/product_unit.dart';
 import 'package:smart_cashier_app/models/user.dart';
 import 'package:smart_cashier_app/module/cashier/services/cashier_services.dart';
 import 'package:collection/collection.dart';
+import 'package:smart_cashier_app/module/cashier/services/receipt_services.dart';
 import 'package:smart_cashier_app/providers/user_provider.dart';
+import 'package:smart_cashier_app/utils/format_rupiah.dart' as format_rupiah;
 
 class CashierScreen extends StatefulWidget {
   const CashierScreen({super.key});
@@ -25,6 +26,8 @@ class _CashierScreenState extends State<CashierScreen> {
   final TextEditingController _exchangeController = TextEditingController();
   final CashierServices cashierServices = CashierServices();
   final TextEditingController _customerNameController = TextEditingController();
+  final TextEditingController _searchProductsController =
+      TextEditingController();
 
   User? userProvider;
 
@@ -34,12 +37,7 @@ class _CashierScreenState extends State<CashierScreen> {
   String paymentStatus = 'paid'; // default
   int get totalProduct => cartItems.fold(0, (sum, item) => sum + item.qty);
   List<CartItem> cartItems = [];
-
-  String toRupiah(dynamic amount) {
-    final rupiahFormatter =
-        NumberFormat.currency(locale: 'id_ID', symbol: 'Rp', decimalDigits: 0);
-    return rupiahFormatter.format(amount);
-  }
+  List<Product> searchItems = [];
 
   createSales() async {
     await cashierServices.createSales(
@@ -50,6 +48,13 @@ class _CashierScreenState extends State<CashierScreen> {
       paymentStatus: paymentStatus,
       customerName: _customerNameController.text,
     );
+    // await ReceiptPrinterService.printReceipt(
+    //   cartItems: cartItems,
+    //   totalPrice: totalPrice,
+    //   paymentMethod: paymentMethod,
+    //   customerName: _customerNameController.text,
+    // );
+
     setState(() {
       cartItems.clear();
       _exchangeController.clear();
@@ -124,13 +129,13 @@ class _CashierScreenState extends State<CashierScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Total Price: ${toRupiah(totalPrice)}",
+                        "Total Price: ${format_rupiah.toRupiah(totalPrice)}",
                         style: const TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 18),
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        "Exchange: ${toRupiah(exchange)}",
+                        "Exchange: ${format_rupiah.toRupiah(exchange)}",
                         style: const TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 18),
                       ),
@@ -234,6 +239,7 @@ class _CashierScreenState extends State<CashierScreen> {
     try {
       List<Product?> products =
           await cashierServices.fetchAllProducts(context: context);
+      List<Product?> searchItems = await List.from(products);
       Navigator.pop(context);
 
       showDialog(
@@ -248,62 +254,92 @@ class _CashierScreenState extends State<CashierScreen> {
               width: MediaQuery.of(context).size.width * 0.7,
               height: MediaQuery.of(context).size.height * 0.7,
               padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    "Select Product",
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        return SingleChildScrollView(
-                          scrollDirection: Axis.vertical,
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: SizedBox(
-                              width: constraints
-                                  .maxWidth, // 💡 Biar tabel ikut selebar dialog
-                              child: DataTable(
-                                headingRowColor: WidgetStateProperty.all(
-                                    GlobalVariables.thirdColor),
-                                columns: const [
-                                  DataColumn(label: Text("Barcode")),
-                                  DataColumn(label: Text("Nama Barang")),
-                                ],
-                                rows: List.generate(products.length, (index) {
-                                  final product = products[index];
-                                  return DataRow(
-                                    cells: [
-                                      DataCell(
-                                        onTap: () {
-                                          _addCartItem(
-                                              product, product.barcode);
-                                          Navigator.pop(context);
-                                        },
-                                        Text(product!.barcode),
-                                      ),
-                                      DataCell(
-                                        onTap: () {
-                                          _addCartItem(
-                                              product, product.barcode);
-                                          Navigator.pop(context);
-                                        },
-                                        Text(product.productName),
-                                      ),
+              child: StatefulBuilder(
+                builder: (context, setStateDialog) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Select Product",
+                        style: TextStyle(
+                            fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(
+                        height: 20,
+                      ),
+                      TextField(
+                        controller: _searchProductsController,
+                        onChanged: (search) {
+                          setStateDialog(() {
+                            if (search.isEmpty) {
+                              searchItems = List.from(products);
+                            } else {
+                              searchItems = products
+                                  .where((item) => item!.productName
+                                      .toLowerCase()
+                                      .contains(search.toLowerCase()))
+                                  .toList();
+                            }
+                          });
+                        },
+                        decoration: const InputDecoration(
+                          labelText: "Search Product",
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.search),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Expanded(
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            return SingleChildScrollView(
+                              scrollDirection: Axis.vertical,
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: SizedBox(
+                                  width: constraints
+                                      .maxWidth, // 💡 Biar tabel ikut selebar dialog
+                                  child: DataTable(
+                                    headingRowColor: WidgetStateProperty.all(
+                                        GlobalVariables.thirdColor),
+                                    columns: const [
+                                      DataColumn(label: Text("Barcode")),
+                                      DataColumn(label: Text("Nama Barang")),
                                     ],
-                                  );
-                                }),
+                                    rows: List.generate(searchItems.length,
+                                        (index) {
+                                      final product = searchItems[index];
+                                      return DataRow(
+                                        cells: [
+                                          DataCell(
+                                            onTap: () {
+                                              _addCartItem(
+                                                  product, product.barcode);
+                                              Navigator.pop(context);
+                                            },
+                                            Text(product!.barcode),
+                                          ),
+                                          DataCell(
+                                            onTap: () {
+                                              _addCartItem(
+                                                  product, product.barcode);
+                                              Navigator.pop(context);
+                                            },
+                                            Text(product.productName),
+                                          ),
+                                        ],
+                                      );
+                                    }),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  )
-                ],
+                            );
+                          },
+                        ),
+                      )
+                    ],
+                  );
+                },
               ),
             ),
           );
@@ -355,12 +391,12 @@ class _CashierScreenState extends State<CashierScreen> {
               children: [
                 CustomTextWidget(
                   title: "Total Price\n",
-                  amount: toRupiah(totalPrice),
+                  amount: format_rupiah.toRupiah(totalPrice),
                 ),
                 const SizedBox(height: 18),
                 CustomTextWidget(
                   title: "Exchange\n",
-                  amount: toRupiah(exchange),
+                  amount: format_rupiah.toRupiah(exchange),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -414,7 +450,7 @@ class _CashierScreenState extends State<CashierScreen> {
       children: [
         Text("Input Item & Payment",
             style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 8),
+        const SizedBox(height: 20),
         Row(
           children: [
             Expanded(
@@ -455,7 +491,7 @@ class _CashierScreenState extends State<CashierScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
         TextField(
           controller: _exchangeController,
           onChanged: (value) {
@@ -501,105 +537,122 @@ class _CashierScreenState extends State<CashierScreen> {
   }
 
   Widget _buildTableSection(BuildContext context) {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.vertical,
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              columns: const [
-                DataColumn(label: Text("No")),
-                DataColumn(label: Text("Nama Barang")),
-                DataColumn(label: Text("Qty")),
-                DataColumn(label: Text("Satuan")),
-                DataColumn(label: Text("Harga")),
-                DataColumn(label: Text("Total")),
-                DataColumn(label: Text("Delete Action")),
-              ],
-              rows: cartItems.isEmpty
-                  ? [
-                      const DataRow(cells: [
-                        DataCell(Text('-')),
-                        DataCell(Text('Belum ada data')),
-                        DataCell(Text('-')),
-                        DataCell(Text('-')),
-                        DataCell(Text('-')),
-                        DataCell(Text('-')),
-                        DataCell(Text('-')),
-                      ]),
-                    ]
-                  : List.generate(
-                      cartItems.length,
-                      (index) {
-                        final item = cartItems[index];
-                        return DataRow(cells: [
-                          DataCell(Text('${index + 1}')),
-                          DataCell(Text(item.product.productName)),
-                          // Input qty
-                          DataCell(
-                            SizedBox(
-                              width: 50,
-                              child: TextField(
-                                keyboardType: TextInputType.number,
-                                decoration: const InputDecoration(
-                                  border: InputBorder.none,
-                                ),
-                                controller: TextEditingController(
-                                  text: item.qty.toString(),
-                                ),
-                                onSubmitted: (val) {
-                                  setState(() {
-                                    item.qty = int.tryParse(val) ?? 0;
-                                  });
-                                },
-                              ),
-                            ),
-                          ),
-                          // 🧩 Dropdown satuan (ProductUnit)
-                          DataCell(
-                            DropdownButton<ProductUnit>(
-                              value: item.selectedUnit,
-                              items: item.product.units
-                                  .map(
-                                    (unit) => DropdownMenuItem(
-                                      value: unit,
-                                      child: Text(unit.nameUnit),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 8.0),
+          child:
+              Text("Cart Items", style: Theme.of(context).textTheme.titleLarge),
+        ),
+        const SizedBox(height: 20),
+        Card(
+          elevation: 3,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.vertical,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Column(
+                  children: [
+                    DataTable(
+                      columns: const [
+                        DataColumn(label: Text("No")),
+                        DataColumn(label: Text("Nama Barang")),
+                        DataColumn(label: Text("Qty")),
+                        DataColumn(label: Text("Satuan")),
+                        DataColumn(label: Text("Harga")),
+                        DataColumn(label: Text("Total")),
+                        DataColumn(label: Text("Delete Action")),
+                      ],
+                      rows: cartItems.isEmpty
+                          ? [
+                              const DataRow(cells: [
+                                DataCell(Text('-')),
+                                DataCell(Text('Belum ada data')),
+                                DataCell(Text('-')),
+                                DataCell(Text('-')),
+                                DataCell(Text('-')),
+                                DataCell(Text('-')),
+                                DataCell(Text('-')),
+                              ]),
+                            ]
+                          : List.generate(
+                              cartItems.length,
+                              (index) {
+                                final item = cartItems[index];
+                                return DataRow(cells: [
+                                  DataCell(Text('${index + 1}')),
+                                  DataCell(Text(item.product.productName)),
+                                  // Input qty
+                                  DataCell(
+                                    SizedBox(
+                                      width: 50,
+                                      child: TextField(
+                                        keyboardType: TextInputType.number,
+                                        decoration: const InputDecoration(
+                                          border: InputBorder.none,
+                                        ),
+                                        controller: TextEditingController(
+                                          text: item.qty.toString(),
+                                        ),
+                                        onSubmitted: (val) {
+                                          setState(() {
+                                            item.qty = int.tryParse(val) ?? 0;
+                                          });
+                                        },
+                                      ),
                                     ),
-                                  )
-                                  .toList(),
-                              onChanged: (unit) {
-                                setState(() {
-                                  item.selectedUnit = unit;
-                                });
+                                  ),
+                                  // 🧩 Dropdown satuan (ProductUnit)
+                                  DataCell(
+                                    DropdownButton<ProductUnit>(
+                                      value: item.selectedUnit,
+                                      items: item.product.units
+                                          .map(
+                                            (unit) => DropdownMenuItem(
+                                              value: unit,
+                                              child: Text(unit.nameUnit),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: (unit) {
+                                        setState(() {
+                                          item.selectedUnit = unit;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  DataCell(Text(format_rupiah.toRupiah(
+                                      item.selectedUnit?.price ?? 0))),
+                                  DataCell(
+                                      Text(format_rupiah.toRupiah(item.total))),
+                                  DataCell(
+                                    IconButton(
+                                        onPressed: () {
+                                          setState(() {
+                                            cartItems.removeAt(index);
+                                          });
+                                        },
+                                        icon: const Icon(
+                                          Icons.delete,
+                                          color: Colors.red,
+                                        )),
+                                  ),
+                                ]);
                               },
                             ),
-                          ),
-                          DataCell(
-                              Text(toRupiah(item.selectedUnit?.price ?? 0))),
-                          DataCell(Text(toRupiah(item.total))),
-                          DataCell(
-                            IconButton(
-                                onPressed: () {
-                                  setState(() {
-                                    cartItems.removeAt(index);
-                                  });
-                                },
-                                icon: const Icon(
-                                  Icons.delete,
-                                  color: Colors.red,
-                                )),
-                          ),
-                        ]);
-                      },
                     ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 }

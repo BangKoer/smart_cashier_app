@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_cashier_app/constant/global_variables.dart';
 import 'package:smart_cashier_app/module/cashier/screens/cashier_screen.dart';
+import 'package:smart_cashier_app/module/products/screens/produtcs_screen.dart';
 import 'package:smart_cashier_app/providers/user_provider.dart';
 
 class CustomSidebarHome extends StatefulWidget {
@@ -14,23 +15,21 @@ class CustomSidebarHome extends StatefulWidget {
 
 class _CustomSidebarHomeState extends State<CustomSidebarHome> {
   int _page = 0;
+  late final List<Widget> _pages;
 
-  // Pages Content
-  List<Widget> pages = [
-    const CashierScreen(),
-    const Center(
-      child: Text('Product Page'),
-    ),
-    const Center(
-      child: Text('Cart Page'),
-    ),
-  ];
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    _pages = const [
+      CashierScreen(),
+      ProdutcsScreen(),
+      Center(child: Text('Cart Page')),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
-    // String token = Provider.of<UserProvider>(context).user.token;
-    // print("token : $token");
-
     final bool isWideScreen = MediaQuery.of(context).size.width >= 700;
 
     Widget drawerContent = Drawer(
@@ -38,7 +37,6 @@ class _CustomSidebarHomeState extends State<CustomSidebarHome> {
       child: ListView(
         children: [
           DrawerHeader(
-
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -46,7 +44,9 @@ class _CustomSidebarHomeState extends State<CustomSidebarHome> {
                   'assets/smartlogo.png',
                   scale: 25,
                 ),
-                SizedBox(height: 10,),
+                SizedBox(
+                  height: 10,
+                ),
                 Image.asset(
                   'assets/smarttext.png',
                   scale: 20,
@@ -80,9 +80,23 @@ class _CustomSidebarHomeState extends State<CustomSidebarHome> {
               child: drawerContent,
             ),
           Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 30),
-              child: pages[_page],
+            child: Builder(
+              builder: (_) {
+                try {
+                  return IndexedStack(
+                    index: _page,
+                    children: _pages,
+                  );
+                } catch (e, st) {
+                  debugPrint("Error di IndexedStack: $e\n$st");
+                  return const Center(
+                    child: Text(
+                      'Terjadi error saat menampilkan halaman 😢',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  );
+                }
+              },
             ),
           ),
         ],
@@ -104,10 +118,13 @@ class _CustomSidebarHomeState extends State<CustomSidebarHome> {
       ),
       selected: selected,
       onTap: () {
+        print('Navigating to page $index');
         setState(() {
           _page = index;
         });
-        Navigator.pop(context); // Menutup drawer di mobile
+        if (MediaQuery.of(context).size.width < 700) {
+          Navigator.of(context).pop();
+        } // Menutup drawer di mobile
       },
     );
   }
