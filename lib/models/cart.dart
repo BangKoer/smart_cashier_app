@@ -3,7 +3,7 @@ import 'package:smart_cashier_app/models/product_unit.dart';
 
 class CartItem {
   final Product product;
-  int qty;
+  double qty;
   ProductUnit? selectedUnit;
 
   CartItem({

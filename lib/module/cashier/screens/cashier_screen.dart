@@ -11,7 +11,7 @@ import 'package:smart_cashier_app/module/cashier/services/cashier_services.dart'
 import 'package:collection/collection.dart';
 import 'package:smart_cashier_app/module/cashier/services/receipt_services.dart';
 import 'package:smart_cashier_app/providers/user_provider.dart';
-import 'package:smart_cashier_app/utils/format_rupiah.dart' as format_rupiah;
+import 'package:smart_cashier_app/utils/format_rupiah.dart' as format;
 
 class CashierScreen extends StatefulWidget {
   const CashierScreen({super.key});
@@ -35,7 +35,7 @@ class _CashierScreenState extends State<CashierScreen> {
   double exchange = 0.0;
   String paymentMethod = 'cash'; // default
   String paymentStatus = 'paid'; // default
-  int get totalProduct => cartItems.fold(0, (sum, item) => sum + item.qty);
+  double get totalProduct => cartItems.fold(0, (sum, item) => sum + item.qty);
   List<CartItem> cartItems = [];
   List<Product> searchItems = [];
 
@@ -58,10 +58,11 @@ class _CashierScreenState extends State<CashierScreen> {
     setState(() {
       cartItems.clear();
       _exchangeController.clear();
+      exchange = 0.0;
     });
   }
 
-  getProductByBarcode(String barcode, {int qty = 1}) async {
+  getProductByBarcode(String barcode, {double qty = 1}) async {
     try {
       Product? productFetch = await cashierServices.fetchProductByBarcode(
           context: context, barcode: barcode);
@@ -76,7 +77,7 @@ class _CashierScreenState extends State<CashierScreen> {
     }
   }
 
-  void _addCartItem(Product product, String barcode, {int qty = 1}) {
+  void _addCartItem(Product product, String barcode, {double qty = 1}) {
     setState(
       () {
         final existingItem = cartItems.firstWhereOrNull(
@@ -99,6 +100,10 @@ class _CashierScreenState extends State<CashierScreen> {
   void _showConfirmsPayDialog() async {
     bool isLoading = false;
 
+    if (_exchangeController.text.isEmpty) {
+      showSnackBar(context, "No Payment Amount!", bgColor: Colors.red);
+      return;
+    }
     showDialog(
       context: context,
       builder: (context) {
@@ -129,13 +134,13 @@ class _CashierScreenState extends State<CashierScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Total Price: ${format_rupiah.toRupiah(totalPrice)}",
+                        "Total Price: ${format.toRupiah(totalPrice)}",
                         style: const TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 18),
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        "Exchange: ${format_rupiah.toRupiah(exchange)}",
+                        "Exchange: ${format.toRupiah(exchange)}",
                         style: const TextStyle(
                             fontWeight: FontWeight.bold, fontSize: 18),
                       ),
@@ -391,12 +396,12 @@ class _CashierScreenState extends State<CashierScreen> {
               children: [
                 CustomTextWidget(
                   title: "Total Price\n",
-                  amount: format_rupiah.toRupiah(totalPrice),
+                  amount: format.toRupiah(totalPrice),
                 ),
                 const SizedBox(height: 18),
                 CustomTextWidget(
                   title: "Exchange\n",
-                  amount: format_rupiah.toRupiah(exchange),
+                  amount: format.toRupiah(exchange),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -470,6 +475,10 @@ class _CashierScreenState extends State<CashierScreen> {
               flex: 1,
               child: TextField(
                 controller: _qtyController,
+                onSubmitted: (value) {
+                  getProductByBarcode(_barcodeController.text,
+                      qty: double.parse(_qtyController.text));
+                },
                 decoration: const InputDecoration(
                   labelText: "Qty",
                   border: OutlineInputBorder(),
@@ -480,7 +489,7 @@ class _CashierScreenState extends State<CashierScreen> {
             const SizedBox(width: 8),
             ElevatedButton(
               onPressed: () => getProductByBarcode(_barcodeController.text,
-                  qty: int.parse(_qtyController.text)),
+                  qty: double.parse(_qtyController.text)),
               style: ElevatedButton.styleFrom(
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(5),
@@ -499,7 +508,9 @@ class _CashierScreenState extends State<CashierScreen> {
               exchange = -(totalPrice - double.parse(value));
             });
           },
-          onSubmitted: (_) => getProductByBarcode(_barcodeController.text),
+          onSubmitted: (_) {
+            _showConfirmsPayDialog();
+          },
           decoration: const InputDecoration(
             labelText: "Pay Amount",
             border: OutlineInputBorder(),
@@ -597,11 +608,11 @@ class _CashierScreenState extends State<CashierScreen> {
                                           border: InputBorder.none,
                                         ),
                                         controller: TextEditingController(
-                                          text: item.qty.toString(),
+                                          text: format.formatDouble(item.qty),
                                         ),
                                         onSubmitted: (val) {
                                           setState(() {
-                                            item.qty = int.tryParse(val) ?? 0;
+                                            item.qty = double.tryParse(val) ?? 0;
                                           });
                                         },
                                       ),
@@ -626,10 +637,10 @@ class _CashierScreenState extends State<CashierScreen> {
                                       },
                                     ),
                                   ),
-                                  DataCell(Text(format_rupiah.toRupiah(
+                                  DataCell(Text(format.toRupiah(
                                       item.selectedUnit?.price ?? 0))),
                                   DataCell(
-                                      Text(format_rupiah.toRupiah(item.total))),
+                                      Text(format.toRupiah(item.total))),
                                   DataCell(
                                     IconButton(
                                         onPressed: () {
