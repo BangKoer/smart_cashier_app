@@ -304,7 +304,8 @@ class _CashierScreenState extends State<CashierScreen> {
                                 child: SizedBox(
                                   width: constraints
                                       .maxWidth, // 💡 Biar tabel ikut selebar dialog
-                                  child: DataTable(
+                                  child: 
+                                  DataTable(
                                     headingRowColor: WidgetStateProperty.all(
                                         GlobalVariables.thirdColor),
                                     columns: const [
