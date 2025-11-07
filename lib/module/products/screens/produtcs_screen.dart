@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:smart_cashier_app/constant/global_variables.dart';
+import 'package:smart_cashier_app/models/product.dart';
+import 'package:smart_cashier_app/models/product_unit.dart';
+import 'package:smart_cashier_app/module/products/services/products_services.dart';
 
 class ProdutcsScreen extends StatefulWidget {
   const ProdutcsScreen({super.key});
@@ -11,58 +14,91 @@ class ProdutcsScreen extends StatefulWidget {
 class _ProdutcsScreenState extends State<ProdutcsScreen> {
   final TextEditingController _searchProductController =
       TextEditingController();
+  final ProductServices productServices = ProductServices();
+  List<Product> searchProduct = [];
+
+  getAllProduct() async {
+    searchProduct = await productServices.fetchAllProducts(context: context);
+    setState(() {});
+  }
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    getAllProduct();
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
     double screenSizeWidth = MediaQuery.of(context).size.width;
-    bool isWideScreen = screenSizeWidth > 800;
+    bool isWideScreen = screenSizeWidth > 950;
     return Scaffold(
       body: Padding(
         padding: EdgeInsets.symmetric(
             horizontal: isWideScreen ? 50.0 : 12.0, vertical: 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Title
-            const Text(
-              "List of Products",
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.bold,
-                color: GlobalVariables.thirdColor,
+        child: Container(
+          height: MediaQuery.of(context).size.height,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Title
+              const Text(
+                "List of Products",
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.bold,
+                  color: GlobalVariables.thirdColor,
+                ),
               ),
-            ),
-            SizedBox(
-              height: 10,
-            ),
-            // Add Product Elevated Button
-            CustomButtonProductsScreen(
-                isWideScreen: isWideScreen, screenSizeWidth: screenSizeWidth),
-            const SizedBox(height: 10),
+              SizedBox(
+                height: 10,
+              ),
+              // Add Product Elevated Button
+              CustomButtonProductsScreen(
+                  isWideScreen: isWideScreen, screenSizeWidth: screenSizeWidth),
+              const SizedBox(height: 10),
 
-            // Textfield for search
-            CustomTextFieldProductsScreen(
-                searchProductController: _searchProductController),
+              // Textfield for search
+              CustomTextFieldProductsScreen(
+                  searchProductController: _searchProductController),
 
-            const SizedBox(height: 10),
+              const SizedBox(height: 10),
 
-            // Tabel products
-            CustomTabelProductsScreen(isWideScreen: isWideScreen)
-          ],
+              // Tabel products
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.vertical,
+                  child: CustomTabelProductsScreen(
+                    isWideScreen: isWideScreen,
+                    searchProduct: searchProduct,
+                  ),
+                ),
+              )
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class CustomTabelProductsScreen extends StatelessWidget {
+class CustomTabelProductsScreen extends StatefulWidget {
   const CustomTabelProductsScreen({
     super.key,
     required this.isWideScreen,
+    required this.searchProduct,
   });
 
   final bool isWideScreen;
+  final List<Product> searchProduct;
 
+  @override
+  State<CustomTabelProductsScreen> createState() =>
+      _CustomTabelProductsScreenState();
+}
+
+class _CustomTabelProductsScreenState extends State<CustomTabelProductsScreen> {
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -76,28 +112,100 @@ class CustomTabelProductsScreen extends StatelessWidget {
           scrollDirection: Axis.vertical,
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child: SizedBox(
-              width: isWideScreen ? constraint.maxWidth : null,
-              child: DataTable(columns: const [
-                DataColumn(label: Text("No")),
-                DataColumn(label: Text("Nama Barang")),
-                DataColumn(label: Text("Qty")),
-                DataColumn(label: Text("Satuan")),
-                DataColumn(label: Text("Harga")),
-                DataColumn(label: Text("Total")),
-                DataColumn(label: Text("Action")),
-              ], rows: [
-                const DataRow(cells: [
-                  DataCell(Text('-')),
-                  DataCell(Text('Belum ada data')),
-                  DataCell(Text('-')),
-                  DataCell(Text('-')),
-                  DataCell(Text('-')),
-                  DataCell(Text('-')),
-                  DataCell(Text('-')),
-                ]),
-              ]),
-            ),
+            child: DataTable(
+                dataRowMinHeight: 48,
+                columns: const [
+                  DataColumn(label: Text("No")),
+                  DataColumn(label: Text("Barcode")),
+                  DataColumn(
+                      label: Text("Nama Barang",
+                          overflow: TextOverflow.ellipsis, maxLines: 1)),
+                  DataColumn(label: Text("Kategori")),
+                  DataColumn(label: Text("Stock")),
+                  DataColumn(label: Text("Satuan")),
+                  DataColumn(label: Text("Harga Satuan")),
+                  DataColumn(
+                      label: Text("Harga Pembelian Dari Seller",
+                          overflow: TextOverflow.ellipsis)),
+                  DataColumn(label: Text("Action")),
+                ],
+                rows: widget.searchProduct.isEmpty
+                    ? [
+                        const DataRow(
+                          cells: [
+                            DataCell(Text('-')),
+                            DataCell(Text('-')),
+                            DataCell(Text('-')),
+                            DataCell(Text('-')),
+                            DataCell(Text('-')),
+                            DataCell(Text('-')),
+                            DataCell(Text('-')),
+                            DataCell(Text('-')),
+                            DataCell(Text('-')),
+                          ],
+                        ),
+                      ]
+                    : List.generate(
+                        widget.searchProduct.length,
+                        (index) {
+                          final item = widget.searchProduct[index];
+                          return DataRow(
+                            cells: [
+                              DataCell(Text('${item.id}')),
+                              DataCell(Text('${item.barcode}')),
+                              DataCell(Text('${item.productName}')),
+                              DataCell(Text('${item.category.name}')),
+                              DataCell(Text('${item.stock}')),
+                              DataCell(SingleChildScrollView(
+                                scrollDirection: Axis.vertical,
+                                child: Column(
+                                  children: [
+                                    Text(item.units
+                                        .map((unit) => unit.nameUnit)
+                                        .join('\n')),
+                                  ],
+                                ),
+                              )),
+                              DataCell(SingleChildScrollView(
+                                scrollDirection: Axis.vertical,
+                                child: Column(
+                                  children: [
+                                    Text(item.units
+                                        .map((unit) => unit.price)
+                                        .join('\n')),
+                                  ],
+                                ),
+                              )),
+                              DataCell(Text('${item.purchasedPrice}')),
+                              DataCell(Row(
+                                children: [
+                                  IconButton(
+                                    onPressed: () {},
+                                    icon: const Icon(Icons.edit),
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: Colors.yellow,
+                                      shape: const RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.all(Radius.circular(5)),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  IconButton(
+                                    onPressed: () {},
+                                    icon: const Icon(Icons.delete_forever),
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                      shape: const RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.all(Radius.circular(5)),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )),
+                            ],
+                          );
+                        },
+                      )),
           ),
         );
       }),
