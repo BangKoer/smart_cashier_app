@@ -202,7 +202,7 @@ class _CashierScreenState extends State<CashierScreen> {
                         children: [
                           TextButton(
                             onPressed: () => Navigator.pop(context),
-                            child: const Text("Batal"),
+                            child: const Text("Cancel"),
                             style: ElevatedButton.styleFrom(
                               shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(5)),
@@ -221,7 +221,7 @@ class _CashierScreenState extends State<CashierScreen> {
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,
                             ),
-                            child: const Text("Konfirmasi"),
+                            child: const Text("Confirm"),
                           ),
                         ],
                       ),
@@ -255,7 +255,8 @@ class _CashierScreenState extends State<CashierScreen> {
             backgroundColor: GlobalVariables.backgroundColor,
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: Container(
+            child: 
+            Container(
               width: MediaQuery.of(context).size.width * 0.7,
               height: MediaQuery.of(context).size.height * 0.7,
               padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 20),

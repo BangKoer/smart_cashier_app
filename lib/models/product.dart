@@ -50,7 +50,7 @@ class Product {
           [],
       category: map['category'] != null
           ? Category.fromMap(map['category'])
-          : Category(name: ''),
+          : Category.fromMap(map['name']),
     );
   }
 

@@ -1,7 +1,6 @@
 import jwt from 'jsonwebtoken'
 
 
-
 const auth = async (req, res, next) => {
     const JWT_SECRET = "rahasia";
     try {
