@@ -11,15 +11,17 @@ import 'package:http/http.dart' as http;
 import 'package:smart_cashier_app/providers/user_provider.dart';
 
 class CashierServices {
-  Future<void> createSales({
+  Future<bool> createSales({
     required BuildContext context,
     required List<CartItem> cartItems,
     required double totalPrice,
+    double? totalPayout,
     required String paymentMethod,
     required String paymentStatus,
     required String customerName,
   }) async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
+    bool isSuccess = false;
     try {
       // Ubah item dalam CartItem jadi bentuk yang bisa di POST Ke Backend
       final List<Map<String, dynamic>> items = cartItems.map(
@@ -36,6 +38,7 @@ class CashierServices {
       final Map<String, dynamic> bodyPost = {
         "id_user": userProvider.user.id, // atau sesuai field usermu
         "total_price": totalPrice,
+        "total_payout": totalPayout ?? totalPrice,
         "payment_method": paymentMethod,
         "payment_status": paymentStatus,
         "customer_name": customerName,
@@ -55,6 +58,7 @@ class CashierServices {
         response: res,
         context: context,
         onSuccess: () {
+          isSuccess = true;
           showSnackBar(
             context,
             bgColor: Colors.green,
@@ -70,6 +74,73 @@ class CashierServices {
         e.toString(),
       );
     }
+    return isSuccess;
+  }
+
+  Future<bool> updateSales({
+    required BuildContext context,
+    required int id,
+    required List<CartItem> cartItems,
+    required double totalPrice,
+    double? totalPayout,
+    required String paymentMethod,
+    required String paymentStatus,
+    required String customerName,
+  }) async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false).user;
+    bool isSuccess = false;
+    try {
+      final List<Map<String, dynamic>> items = cartItems.map(
+        (item) {
+          return {
+            "id_product": item.product.id,
+            "id_product_unit": item.selectedUnit?.id ?? 1,
+            "quantity": item.qty,
+            "sub_total": item.total,
+          };
+        },
+      ).toList();
+
+      final Map<String, dynamic> bodyPut = {
+        "id_user": userProvider.id,
+        "total_price": totalPrice,
+        "total_payout": totalPayout ?? totalPrice,
+        "payment_method": paymentMethod,
+        "payment_status": paymentStatus,
+        "customer_name": customerName,
+        "items": items,
+      };
+
+      http.Response res = await http.put(
+        Uri.parse('$baseUrl/api/sales/$id'),
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'x-auth-token': userProvider.token,
+        },
+        body: jsonEncode(bodyPut),
+      );
+
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          isSuccess = true;
+          showSnackBar(
+            context,
+            bgColor: Colors.green,
+            "Sales updated successfully",
+          );
+        },
+      );
+    } catch (e) {
+      debugPrint(e.toString());
+      showSnackBar(
+        context,
+        bgColor: Colors.red,
+        e.toString(),
+      );
+    }
+    return isSuccess;
   }
 
   Future<List<Product?>> fetchAllProducts(

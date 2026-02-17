@@ -789,8 +789,8 @@ class _CustomTabelProductsScreenState extends State<CustomTabelProductsScreen> {
                     final item = widget.searchProduct[index];
                     return DataRow(
                       cells: [
-                        DataCell(Text('${item!.id}')),
-                        DataCell(Text('${item.barcode}')),
+                        DataCell(Text('${++index}')),
+                        DataCell(Text('${item!.barcode}')),
                         DataCell(Text(item.productName)),
                         DataCell(Text(item.category.name)),
                         DataCell(Text('${item.stock}')),

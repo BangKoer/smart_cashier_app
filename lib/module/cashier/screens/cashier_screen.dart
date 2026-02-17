@@ -6,6 +6,7 @@ import 'package:smart_cashier_app/constant/utils.dart';
 import 'package:smart_cashier_app/models/cart.dart';
 import 'package:smart_cashier_app/models/product.dart';
 import 'package:smart_cashier_app/models/product_unit.dart';
+import 'package:smart_cashier_app/models/sales.dart' as sales_model;
 import 'package:smart_cashier_app/models/user.dart';
 import 'package:smart_cashier_app/module/cashier/services/cashier_services.dart';
 import 'package:collection/collection.dart';
@@ -14,7 +15,9 @@ import 'package:smart_cashier_app/providers/user_provider.dart';
 import 'package:smart_cashier_app/utils/format_rupiah.dart' as format;
 
 class CashierScreen extends StatefulWidget {
-  const CashierScreen({super.key});
+  final sales_model.Sales? editingSale;
+
+  const CashierScreen({super.key, this.editingSale});
 
   @override
   State<CashierScreen> createState() => _CashierScreenState();
@@ -38,12 +41,20 @@ class _CashierScreenState extends State<CashierScreen> {
   double get totalProduct => cartItems.fold(0, (sum, item) => sum + item.qty);
   List<CartItem> cartItems = [];
   List<Product> searchItems = [];
+  bool isInitializingEdit = false;
 
-  createSales() async {
-    await cashierServices.createSales(
+  bool get isEditMode => widget.editingSale != null;
+
+  double _getTotalPayout() {
+    return double.tryParse(_exchangeController.text.trim()) ?? 0.0;
+  }
+
+  Future<bool> createSales() async {
+    final isSuccess = await cashierServices.createSales(
       context: context,
       cartItems: cartItems,
       totalPrice: totalPrice,
+      totalPayout: _getTotalPayout(),
       paymentMethod: paymentMethod,
       paymentStatus: paymentStatus,
       customerName: _customerNameController.text,
@@ -55,10 +66,81 @@ class _CashierScreenState extends State<CashierScreen> {
     //   customerName: _customerNameController.text,
     // );
 
+    if (isSuccess && mounted) {
+      setState(() {
+        cartItems.clear();
+        _exchangeController.clear();
+        exchange = 0.0;
+      });
+    }
+    return isSuccess;
+  }
+
+  Future<bool> updateSales() async {
+    if (!isEditMode) return false;
+
+    final isSuccess = await cashierServices.updateSales(
+      context: context,
+      id: widget.editingSale!.id,
+      cartItems: cartItems,
+      totalPrice: totalPrice,
+      totalPayout: _getTotalPayout(),
+      paymentMethod: paymentMethod,
+      paymentStatus: paymentStatus,
+      customerName: _customerNameController.text,
+    );
+
+    if (isSuccess && mounted) {
+      setState(() {
+        cartItems.clear();
+        _exchangeController.clear();
+        exchange = 0.0;
+      });
+    }
+
+    return isSuccess;
+  }
+
+  Future<void> initializeEditSale() async {
+    if (!isEditMode) return;
+
     setState(() {
-      cartItems.clear();
-      _exchangeController.clear();
-      exchange = 0.0;
+      isInitializingEdit = true;
+    });
+
+    final sale = widget.editingSale!;
+    final productsRaw = await cashierServices.fetchAllProducts(context: context);
+    final products = productsRaw.whereType<Product>().toList();
+    final mappedCartItems = <CartItem>[];
+
+    for (final item in sale.salesItems) {
+      final product = products.firstWhereOrNull((p) => p.id == item.id_product);
+      if (product == null) continue;
+
+      final selectedUnit = product.units.firstWhereOrNull(
+            (unit) => unit.id == item.id_product_unit,
+          ) ??
+          product.units.firstOrNull;
+      if (selectedUnit == null) continue;
+
+      mappedCartItems.add(
+        CartItem(
+          product: product,
+          qty: item.quantity <= 0 ? 1 : item.quantity,
+          selectedUnit: selectedUnit,
+        ),
+      );
+    }
+
+    if (!mounted) return;
+    setState(() {
+      cartItems = mappedCartItems;
+      paymentMethod = sale.payment_method;
+      paymentStatus = sale.payment_status;
+      _customerNameController.text = sale.customer_name ?? '';
+      _exchangeController.text = sale.total_payout.toString();
+      exchange = sale.total_payout - sale.total_price;
+      isInitializingEdit = false;
     });
   }
 
@@ -113,7 +195,7 @@ class _CashierScreenState extends State<CashierScreen> {
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             title: Text(
-              "Confirm Payment",
+              isEditMode ? "Confirm Update" : "Confirm Payment",
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
             content: StatefulBuilder(
@@ -150,7 +232,7 @@ class _CashierScreenState extends State<CashierScreen> {
                       TextField(
                         controller: _customerNameController,
                         decoration: const InputDecoration(
-                          labelText: "Nama Customer (optional)",
+                          labelText: "Customer Name (optional)",
                           border: OutlineInputBorder(),
                         ),
                       ),
@@ -160,7 +242,7 @@ class _CashierScreenState extends State<CashierScreen> {
                       DropdownButtonFormField<String>(
                         value: paymentMethod,
                         decoration: const InputDecoration(
-                          labelText: "Metode Pembayaran",
+                          labelText: "Payment Method",
                           border: OutlineInputBorder(),
                         ),
                         items: const [
@@ -179,7 +261,7 @@ class _CashierScreenState extends State<CashierScreen> {
                       DropdownButtonFormField<String>(
                         value: paymentStatus,
                         decoration: const InputDecoration(
-                          labelText: "Status Pembayaran",
+                          labelText: "Payment Status",
                           border: OutlineInputBorder(),
                         ),
                         items: const [
@@ -211,9 +293,15 @@ class _CashierScreenState extends State<CashierScreen> {
                           ElevatedButton(
                             onPressed: () async {
                               setState(() => isLoading = true);
-                              await createSales();
+                              final isSuccess = isEditMode
+                                  ? await updateSales()
+                                  : await createSales();
+                              if (!mounted) return;
                               setState(() => isLoading = false);
-                              Navigator.pop(context); // tutup dialog dulu
+                              Navigator.pop(context);
+                              if (isSuccess && isEditMode && mounted) {
+                                Navigator.pop(this.context, true);
+                              }
                             },
                             style: ElevatedButton.styleFrom(
                               shape: RoundedRectangleBorder(
@@ -221,7 +309,7 @@ class _CashierScreenState extends State<CashierScreen> {
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,
                             ),
-                            child: const Text("Confirm"),
+                            child: Text(isEditMode ? "Confirm Update" : "Confirm"),
                           ),
                         ],
                       ),
@@ -359,6 +447,14 @@ class _CashierScreenState extends State<CashierScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    if (isEditMode) {
+      initializeEditSale();
+    }
+  }
+
+  @override
   void dispose() {
     _barcodeController.dispose();
     _qtyController.dispose();
@@ -368,9 +464,24 @@ class _CashierScreenState extends State<CashierScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (isInitializingEdit) {
+      return const Scaffold(
+        body: Center(child: CustomLoading()),
+      );
+    }
+
     userProvider = Provider.of<UserProvider>(context).user;
     bool isWideScreen = MediaQuery.of(context).size.width > 800;
     return Scaffold(
+      appBar: isEditMode
+          ? AppBar(
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.pop(context),
+              ),
+              title: const Text("Edit Sale"),
+            )
+          : null,
       floatingActionButton: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
@@ -421,7 +532,7 @@ class _CashierScreenState extends State<CashierScreen> {
                 return SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 1200),
+                    constraints: BoxConstraints(minWidth: constraints.maxWidth),
                     child: isWide
                         ? Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -525,7 +636,7 @@ class _CashierScreenState extends State<CashierScreen> {
         ElevatedButton.icon(
           onPressed: _showConfirmsPayDialog,
           icon: const Icon(Icons.payment),
-          label: const Text("Pay"),
+          label: Text(isEditMode ? "Update Sale" : "Pay"),
           style: ElevatedButton.styleFrom(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(5),

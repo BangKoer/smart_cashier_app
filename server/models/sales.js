@@ -1,30 +1,39 @@
 import { Sequelize, DataTypes } from "sequelize";
 import sequelize from "../database.js";
-import SaleItem from "./SaleItem.js";
-import User from "./User.js";
 
 const Sales = sequelize.define(
-    "Sales", 
+    "Sales",
     {
         id: {
             type: DataTypes.INTEGER,
             autoIncrement: true,
-            primaryKey:true,
+            primaryKey: true,
         },
         id_user: {
             type: DataTypes.INTEGER,
-            allowNull:false,
+            allowNull: false,
             references: {
                 model: "tb_user",
                 key: "id",
             },
         },
-        total_price: DataTypes.DECIMAL,
-        payment_method: DataTypes.STRING,
+        total_price: {
+            type: DataTypes.DECIMAL(10, 2),
+            allowNull: false,
+        },
+        total_payout: {
+            type: DataTypes.DECIMAL(10, 2),
+            allowNull: false,
+            defaultValue: 0,
+        },
+        payment_method: {
+            type: DataTypes.STRING,
+            allowNull: false,
+        },
         payment_status: {
             type: DataTypes.ENUM("paid", "pending"),
             defaultValue: "paid",
-            allowNull:false,
+            allowNull: false,
         },
         customer_name: {
             type: DataTypes.STRING,
@@ -33,6 +42,7 @@ const Sales = sequelize.define(
         created_at: {
             type: DataTypes.DATE,
             defaultValue: Sequelize.NOW,
+            allowNull: false,
         }
     },
     {
