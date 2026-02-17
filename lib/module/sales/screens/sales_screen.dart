@@ -94,6 +94,41 @@ class _SalesState extends State<Sales> {
     return qty.toString();
   }
 
+  Future<void> _confirmDeleteSales(sales_model.Sales sales) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Delete Sales"),
+        content: Text(
+          "Delete sales note #${sales.id}? This action cannot be undone.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text("Delete"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+    final isDeleted = await salesServices.deleteSales(
+      context: context,
+      id: sales.id,
+    );
+    if (isDeleted && mounted) {
+      _fetchSales();
+    }
+  }
+
   void _showSalesDetailDialog(sales_model.Sales sales) {
     showDialog(
       context: context,
@@ -446,7 +481,7 @@ class _SalesState extends State<Sales> {
                               ),
                               const SizedBox(width: 5),
                               IconButton(
-                                onPressed: () {},
+                                onPressed: () => _confirmDeleteSales(sales),
                                 icon: const Icon(Icons.delete_forever),
                                 style: IconButton.styleFrom(
                                   backgroundColor: Colors.red,

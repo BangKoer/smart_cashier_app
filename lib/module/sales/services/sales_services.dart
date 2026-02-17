@@ -129,4 +129,38 @@ class SalesServices {
     }
     return isSuccess;
   }
+
+  Future<bool> deleteSales({
+    required BuildContext context,
+    required int id,
+  }) async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false).user;
+    bool isSuccess = false;
+    try {
+      final http.Response res = await http.delete(
+        Uri.parse('$baseUrl/api/sales/$id'),
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'x-auth-token': userProvider.token,
+        },
+      );
+
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          isSuccess = true;
+          showSnackBar(
+            context,
+            "Sales deleted successfully",
+            bgColor: Colors.green,
+          );
+        },
+      );
+    } catch (e) {
+      debugPrint(e.toString());
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
+    }
+    return isSuccess;
+  }
 }

@@ -207,4 +207,47 @@ salesRoute.get('/api/sales/:id', auth, async (req, res) => {
     }
 });
 
+// Delete sales and its sale items
+salesRoute.delete('/api/sales/:id', auth, async (req, res) => {
+    let t = await Sales.sequelize.transaction();
+    try {
+        const { id } = req.params;
+        const salesId = Number(id);
+
+        if (Number.isNaN(salesId)) {
+            await t.rollback();
+            return res.status(400).json({
+                msg: "Invalid sales id",
+            });
+        }
+
+        const sales = await Sales.findByPk(salesId, { transaction: t });
+        if (!sales) {
+            await t.rollback();
+            return res.status(404).json({
+                msg: "Sales not found",
+            });
+        }
+
+        await SaleItem.destroy({
+            where: { id_sales: salesId },
+            transaction: t,
+        });
+
+        await Sales.destroy({
+            where: { id: salesId },
+            transaction: t,
+        });
+
+        await t.commit();
+        return res.status(200).json({
+            msg: "Sales deleted successfully",
+            id: salesId,
+        });
+    } catch (e) {
+        if (t) await t.rollback();
+        return res.status(500).json({ error: e.message });
+    }
+});
+
 export default salesRoute;
