@@ -224,3 +224,172 @@ class ProductServices {
     return isSuccess;
   }
 }
+
+class CategoryServices {
+  Future<List<Category>> fetchAllCategories({
+    required BuildContext context,
+  }) async {
+    List<Category> listCategories = [];
+    final userProvider = Provider.of<UserProvider>(context, listen: false).user;
+    try {
+      final http.Response res = await http.get(
+        Uri.parse('$baseUrl/api/categories'),
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'x-auth-token': userProvider.token,
+        },
+      );
+
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          final dynamic resDecode = jsonDecode(res.body);
+          listCategories = List<Category>.from(
+            (resDecode as List).map((item) => Category.fromMap(item)),
+          );
+        },
+      );
+      return listCategories;
+    } catch (e) {
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
+    }
+    return listCategories;
+  }
+
+  Future<Category?> fetchCategoryById({
+    required BuildContext context,
+    required int id,
+  }) async {
+    Category? category;
+    final userProvider = Provider.of<UserProvider>(context, listen: false).user;
+    try {
+      final http.Response res = await http.get(
+        Uri.parse('$baseUrl/api/categories/$id'),
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'x-auth-token': userProvider.token,
+        },
+      );
+
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          final Map<String, dynamic> resDecode = jsonDecode(res.body);
+          category = Category.fromMap(resDecode);
+        },
+      );
+      return category;
+    } catch (e) {
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
+    }
+    return null;
+  }
+
+  Future<bool> addCategory({
+    required BuildContext context,
+    required String name,
+  }) async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false).user;
+    bool isSuccess = false;
+    try {
+      final http.Response res = await http.post(
+        Uri.parse('$baseUrl/api/categories'),
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'x-auth-token': userProvider.token,
+        },
+        body: jsonEncode({
+          "name": name.trim(),
+        }),
+      );
+
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          isSuccess = true;
+          showSnackBar(
+            context,
+            "Category created successfully",
+            bgColor: Colors.green,
+          );
+        },
+      );
+    } catch (e) {
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
+    }
+    return isSuccess;
+  }
+
+  Future<bool> updateCategory({
+    required BuildContext context,
+    required int id,
+    required String name,
+  }) async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false).user;
+    bool isSuccess = false;
+    try {
+      final http.Response res = await http.put(
+        Uri.parse('$baseUrl/api/categories/$id'),
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'x-auth-token': userProvider.token,
+        },
+        body: jsonEncode({
+          "name": name.trim(),
+        }),
+      );
+
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          isSuccess = true;
+          showSnackBar(
+            context,
+            "Category updated successfully",
+            bgColor: Colors.green,
+          );
+        },
+      );
+    } catch (e) {
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
+    }
+    return isSuccess;
+  }
+
+  Future<bool> deleteCategory({
+    required BuildContext context,
+    required int id,
+  }) async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false).user;
+    bool isSuccess = false;
+    try {
+      final http.Response res = await http.delete(
+        Uri.parse('$baseUrl/api/categories/$id'),
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'x-auth-token': userProvider.token,
+        },
+      );
+
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          isSuccess = true;
+          showSnackBar(
+            context,
+            "Category deleted successfully",
+            bgColor: Colors.green,
+          );
+        },
+      );
+    } catch (e) {
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
+    }
+    return isSuccess;
+  }
+}

@@ -6,6 +6,7 @@ import auth from "../middlewares/auth.js";
 
 const productRouter = express.Router();
 
+// Product CRUD Endpoints
 productRouter.post('/api/products', auth, async (req, res) => {
     let t = await Product.sequelize.transaction();
     try {
@@ -210,17 +211,6 @@ productRouter.put('/api/products/:id', auth, async (req, res) => {
     }
 });
 
-productRouter.get('/api/categories', auth, async (req, res) => {
-    try {
-        const categories = await Category.findAll();
-        res.json(categories);
-    } catch (e) {
-        res.status(500).json({
-            error: e.message
-        })
-    }
-})
-
 productRouter.get('/api/products', auth, async (req, res) => {
     try {
         const products = await Product.findAll(
@@ -300,5 +290,152 @@ productRouter.delete('/api/product/:id', auth, async (req, res) => {
         });
     }
 });
+
+// Categories CRUD endpoints
+productRouter.get('/api/categories', auth, async (req, res) => {
+    try {
+        const categories = await Category.findAll();
+        res.json(categories);
+    } catch (e) {
+        res.status(500).json({
+            error: e.message
+        })
+    }
+})
+
+productRouter.get('/api/categories/:id', auth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const category = await Category.findByPk(id);
+        if (!category) {
+            return res.status(404).json({
+                msg: "Category not found"
+            });
+        }
+        return res.status(200).json(category);
+    } catch (e) {
+        return res.status(500).json({
+            error: e.message
+        });
+    }
+});
+
+productRouter.post('/api/categories', auth, async (req, res) => {
+    try {
+        const { name } = req.body;
+        const categoryName = String(name ?? "").trim();
+
+        if (!categoryName) {
+            return res.status(400).json({
+                msg: "Missing required fields",
+                required: ["name"]
+            });
+        }
+
+        const existingCategory = await Category.findOne({
+            where: { name: categoryName }
+        });
+
+        if (existingCategory) {
+            return res.status(409).json({
+                msg: "Category already exists"
+            });
+        }
+
+        const category = await Category.create({
+            name: categoryName
+        });
+
+        return res.status(201).json({
+            msg: "Category created successfully",
+            data: category
+        });
+    } catch (e) {
+        return res.status(500).json({
+            error: e.message
+        });
+    }
+});
+
+productRouter.put('/api/categories/:id', auth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name } = req.body;
+        const categoryName = String(name ?? "").trim();
+
+        if (!categoryName) {
+            return res.status(400).json({
+                msg: "Missing required fields",
+                required: ["name"]
+            });
+        }
+
+        const category = await Category.findByPk(id);
+        if (!category) {
+            return res.status(404).json({
+                msg: "Category not found"
+            });
+        }
+
+        const existingCategory = await Category.findOne({
+            where: { name: categoryName }
+        });
+        if (existingCategory && Number(existingCategory.id) !== Number(id)) {
+            return res.status(409).json({
+                msg: "Category already exists"
+            });
+        }
+
+        await Category.update(
+            { name: categoryName },
+            { where: { id: Number(id) } }
+        );
+
+        const updatedCategory = await Category.findByPk(id);
+        return res.status(200).json({
+            msg: "Category updated successfully",
+            data: updatedCategory
+        });
+    } catch (e) {
+        return res.status(500).json({
+            error: e.message
+        });
+    }
+});
+
+productRouter.delete('/api/categories/:id', auth, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const category = await Category.findByPk(id);
+        if (!category) {
+            return res.status(404).json({
+                msg: "Category not found"
+            });
+        }
+
+        const usedByProduct = await Product.count({
+            where: { id_category: Number(id) }
+        });
+        if (usedByProduct > 0) {
+            return res.status(409).json({
+                msg: "Category is still used by products"
+            });
+        }
+
+        await Category.destroy({
+            where: { id: Number(id) }
+        });
+
+        return res.status(200).json({
+            msg: "Category deleted successfully"
+        });
+    } catch (e) {
+        return res.status(500).json({
+            error: e.message
+        });
+    }
+});
+
 
 export default productRouter;

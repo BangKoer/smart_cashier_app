@@ -72,14 +72,14 @@ class _CustomSidebarHomeState extends State<CustomSidebarHome> {
         centerTitle: true,
         toolbarHeight: 100,
       ),
-      drawer: isWideScreen ? null : drawerContent,
+      drawer: isWideScreen ? drawerContent : drawerContent,
       body: Row(
         children: [
-          if (isWideScreen)
-            SizedBox(
-              width: 250,
-              child: drawerContent,
-            ),
+          // if (isWideScreen)
+          //   SizedBox(
+          //     width: 250,
+          //     child: drawerContent,
+          //   ),
           Expanded(
             child: Builder(
               builder: (_) {

@@ -3,6 +3,7 @@ import 'package:smart_cashier_app/constant/global_variables.dart';
 import 'package:smart_cashier_app/constant/utils.dart';
 import 'package:smart_cashier_app/models/product.dart';
 import 'package:smart_cashier_app/models/category.dart' as categoryProduct;
+import 'package:smart_cashier_app/module/products/screens/categories_screen.dart';
 import 'package:smart_cashier_app/module/products/services/products_services.dart';
 import 'package:smart_cashier_app/utils/format_rupiah.dart' as format;
 
@@ -32,6 +33,11 @@ class _ProdutcsScreenState extends State<ProdutcsScreen> {
   String _selectedStockFilter = 'all';
   String _selectedSortFilter = 'name_asc';
   static const int _lowStockThreshold = 10;
+
+  Future<void> _refreshProductsScreen() async {
+    await getAllProduct();
+    await getAllCategories();
+  }
 
   getAllProduct() async {
     products = await productServices.fetchAllProducts(context: context);
@@ -76,7 +82,10 @@ class _ProdutcsScreenState extends State<ProdutcsScreen> {
   List<Product?> _getFilteredProducts() {
     final filtered = products.where((product) {
       final matchesSearch = _searchQuery.isEmpty ||
-          product.productName.toLowerCase().contains(_searchQuery.toLowerCase());
+          product.productName
+              .toLowerCase()
+              .contains(_searchQuery.toLowerCase()) ||
+          product.barcode.toLowerCase().contains(_searchQuery.toLowerCase());
 
       final matchesCategory = _selectedCategoryFilter == 'all' ||
           product.idCategory.toString() == _selectedCategoryFilter;
@@ -150,9 +159,7 @@ class _ProdutcsScreenState extends State<ProdutcsScreen> {
   }
 
   Future<void> _showAddProductDialog({Product? editingProduct}) async {
-    if (categories.isEmpty) {
-      await getAllCategories();
-    }
+    await getAllCategories();
     if (!mounted) return;
     _resetAddProductForm();
     if (editingProduct != null) {
@@ -193,8 +200,8 @@ class _ProdutcsScreenState extends State<ProdutcsScreen> {
                       final units = <Map<String, dynamic>>[];
                       for (int i = 0; i < _unitControllers.length; i++) {
                         final unitName = _unitControllers[i].text.trim();
-                        final unitPrice =
-                            double.tryParse(_unitPriceControllers[i].text.trim());
+                        final unitPrice = double.tryParse(
+                            _unitPriceControllers[i].text.trim());
 
                         if (unitName.isEmpty || unitPrice == null) {
                           showSnackBar(
@@ -548,7 +555,37 @@ class _ProdutcsScreenState extends State<ProdutcsScreen> {
               ),
 
               // Add Product Elevated Button
-              CustomButtonProductScreen(isWideScreen, screenSizeWidth),
+              Row(
+                children: [
+                  CustomButtonProductScreen(
+                      isWideScreen,
+                      screenSizeWidth,
+                      Colors.green,
+                      "Add Product",
+                      Icons.add,
+                      _showAddProductDialog),
+                  const SizedBox(width: 10),
+                  CustomButtonProductScreen(
+                    isWideScreen,
+                    screenSizeWidth,
+                    Colors.orange,
+                    "Categories",
+                    Icons.category,
+                    () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => CategoriesScreen(
+                            categories: categories,
+                          ),
+                        ),
+                      );
+                      if (!mounted) return;
+                      await getAllCategories();
+                    },
+                  ),
+                ],
+              ),
 
               const SizedBox(height: 10),
 
@@ -563,14 +600,18 @@ class _ProdutcsScreenState extends State<ProdutcsScreen> {
 
               // Tabel products
               Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.vertical,
-                  child: CustomTabelProductsScreen(
-                    isWideScreen: isWideScreen,
-                    searchProduct: _getFilteredProducts(),
-                    onEditProduct: (product) =>
-                        _showAddProductDialog(editingProduct: product),
-                    onDeleteProduct: _showDeleteProductDialog,
+                child: RefreshIndicator(
+                  onRefresh: _refreshProductsScreen,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    scrollDirection: Axis.vertical,
+                    child: CustomTabelProductsScreen(
+                      isWideScreen: isWideScreen,
+                      searchProduct: _getFilteredProducts(),
+                      onEditProduct: (product) =>
+                          _showAddProductDialog(editingProduct: product),
+                      onDeleteProduct: _showDeleteProductDialog,
+                    ),
                   ),
                 ),
               )
@@ -582,24 +623,29 @@ class _ProdutcsScreenState extends State<ProdutcsScreen> {
   }
 
   ElevatedButton CustomButtonProductScreen(
-      bool isWideScreen, double screenSizeWidth) {
+      bool isWideScreen,
+      double screenSizeWidth,
+      Color color,
+      String text,
+      IconData icon,
+      VoidCallback fun) {
     return ElevatedButton(
-      onPressed: _showAddProductDialog,
+      onPressed: fun,
       style: ElevatedButton.styleFrom(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(5),
         ),
         fixedSize: Size(
             isWideScreen ? screenSizeWidth * 0.2 : screenSizeWidth * 0.5, 40),
-        backgroundColor: Colors.green,
+        backgroundColor: color,
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.add),
-          SizedBox(
+          Icon(icon),
+          const SizedBox(
             width: 5,
           ),
-          Text("Add Product")
+          Text(text)
         ],
       ),
     );
@@ -692,10 +738,14 @@ class _ProdutcsScreenState extends State<ProdutcsScreen> {
               items: const [
                 DropdownMenuItem(value: 'name_asc', child: Text("Name A-Z")),
                 DropdownMenuItem(value: 'name_desc', child: Text("Name Z-A")),
-                DropdownMenuItem(value: 'price_asc', child: Text("Price Low-High")),
-                DropdownMenuItem(value: 'price_desc', child: Text("Price High-Low")),
-                DropdownMenuItem(value: 'stock_asc', child: Text("Stock Low-High")),
-                DropdownMenuItem(value: 'stock_desc', child: Text("Stock High-Low")),
+                DropdownMenuItem(
+                    value: 'price_asc', child: Text("Price Low-High")),
+                DropdownMenuItem(
+                    value: 'price_desc', child: Text("Price High-Low")),
+                DropdownMenuItem(
+                    value: 'stock_asc', child: Text("Stock Low-High")),
+                DropdownMenuItem(
+                    value: 'stock_desc', child: Text("Stock High-Low")),
               ],
               onChanged: (value) {
                 setState(() {
@@ -750,106 +800,111 @@ class _CustomTabelProductsScreenState extends State<CustomTabelProductsScreen> {
           scrollDirection: Axis.vertical,
           child: SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child: DataTable(
-                dataRowMinHeight: 48,
-                columns: const [
-                  DataColumn(label: Text("No")),
-                  DataColumn(label: Text("Barcode")),
-                  DataColumn(
-                      label: Text("Product Name",
-                          overflow: TextOverflow.ellipsis, maxLines: 1)),
-                  DataColumn(label: Text("Category")),
-                  DataColumn(label: Text("Stock")),
-                  DataColumn(label: Text("Units")),
-                  DataColumn(label: Text("Sub Total")),
-                  DataColumn(
-                      label: Text("Seller Purchased",
-                          overflow: TextOverflow.ellipsis)),
-                  DataColumn(label: Text("Action")),
-                ],
-                rows: List.generate(
-                  widget.searchProduct.isEmpty ? 1 : widget.searchProduct.length,
-                  (index) {
-                    if (widget.searchProduct.isEmpty) {
-                      return const DataRow(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: constraint.maxWidth),
+              child: DataTable(
+                  dataRowMinHeight: 48,
+                  columns: const [
+                    DataColumn(label: Text("No")),
+                    DataColumn(label: Text("Barcode")),
+                    DataColumn(
+                        label: Text("Product Name",
+                            overflow: TextOverflow.ellipsis, maxLines: 1)),
+                    DataColumn(label: Text("Category")),
+                    DataColumn(label: Text("Stock")),
+                    DataColumn(label: Text("Units")),
+                    DataColumn(label: Text("Sub Total")),
+                    DataColumn(
+                        label: Text("Seller Purchased",
+                            overflow: TextOverflow.ellipsis)),
+                    DataColumn(label: Text("Action")),
+                  ],
+                  rows: List.generate(
+                    widget.searchProduct.isEmpty
+                        ? 1
+                        : widget.searchProduct.length,
+                    (index) {
+                      if (widget.searchProduct.isEmpty) {
+                        return const DataRow(
+                          cells: [
+                            DataCell(Text('-')),
+                            DataCell(Text('-')),
+                            DataCell(Text('No products match current filters')),
+                            DataCell(Text('-')),
+                            DataCell(Text('-')),
+                            DataCell(Text('-')),
+                            DataCell(Text('-')),
+                            DataCell(Text('-')),
+                            DataCell(Text('-')),
+                          ],
+                        );
+                      }
+
+                      final item = widget.searchProduct[index];
+                      return DataRow(
                         cells: [
-                          DataCell(Text('-')),
-                          DataCell(Text('-')),
-                          DataCell(Text('No products match current filters')),
-                          DataCell(Text('-')),
-                          DataCell(Text('-')),
-                          DataCell(Text('-')),
-                          DataCell(Text('-')),
-                          DataCell(Text('-')),
-                          DataCell(Text('-')),
+                          DataCell(Text('${++index}')),
+                          DataCell(Text('${item!.barcode}')),
+                          DataCell(Text(item.productName)),
+                          DataCell(Text(item.category.name)),
+                          DataCell(Text('${item.stock}')),
+                          DataCell(SingleChildScrollView(
+                            scrollDirection: Axis.vertical,
+                            child: Column(
+                              children: [
+                                Text(item.units
+                                    .map((unit) => unit.nameUnit)
+                                    .join('\n')),
+                              ],
+                            ),
+                          )),
+                          DataCell(SingleChildScrollView(
+                            scrollDirection: Axis.vertical,
+                            child: Column(
+                              children: [
+                                Text(item.units
+                                    .map((unit) => format.toRupiah(unit.price))
+                                    .join('\n')),
+                              ],
+                            ),
+                          )),
+                          DataCell(Text(format.toRupiah(item.purchasedPrice))),
+                          DataCell(Row(
+                            children: [
+                              IconButton(
+                                onPressed: () {
+                                  widget.onEditProduct(item);
+                                },
+                                icon: const Icon(Icons.edit),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.yellow,
+                                  shape: const RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.all(Radius.circular(5)),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              IconButton(
+                                onPressed: () {
+                                  widget.onDeleteProduct(item);
+                                },
+                                icon: const Icon(Icons.delete_forever),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: Colors.red,
+                                  shape: const RoundedRectangleBorder(
+                                    borderRadius:
+                                        BorderRadius.all(Radius.circular(5)),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )),
                         ],
                       );
-                    }
-
-                    final item = widget.searchProduct[index];
-                    return DataRow(
-                      cells: [
-                        DataCell(Text('${++index}')),
-                        DataCell(Text('${item!.barcode}')),
-                        DataCell(Text(item.productName)),
-                        DataCell(Text(item.category.name)),
-                        DataCell(Text('${item.stock}')),
-                        DataCell(SingleChildScrollView(
-                          scrollDirection: Axis.vertical,
-                          child: Column(
-                            children: [
-                              Text(item.units
-                                  .map((unit) => unit.nameUnit)
-                                  .join('\n')),
-                            ],
-                          ),
-                        )),
-                        DataCell(SingleChildScrollView(
-                          scrollDirection: Axis.vertical,
-                          child: Column(
-                            children: [
-                              Text(item.units
-                                  .map((unit) => format.toRupiah(unit.price))
-                                  .join('\n')),
-                            ],
-                          ),
-                        )),
-                        DataCell(Text(format.toRupiah(item.purchasedPrice))),
-                        DataCell(Row(
-                          children: [
-                            IconButton(
-                              onPressed: () {
-                                widget.onEditProduct(item);
-                              },
-                              icon: const Icon(Icons.edit),
-                              style: IconButton.styleFrom(
-                                backgroundColor: Colors.yellow,
-                                shape: const RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.all(Radius.circular(5)),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 5),
-                            IconButton(
-                              onPressed: () {
-                                widget.onDeleteProduct(item);
-                              },
-                              icon: const Icon(Icons.delete_forever),
-                              style: IconButton.styleFrom(
-                                backgroundColor: Colors.red,
-                                shape: const RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.all(Radius.circular(5)),
-                                ),
-                              ),
-                            ),
-                          ],
-                        )),
-                      ],
-                    );
-                  },
-                )),
+                    },
+                  )),
+            ),
           ),
         );
       }),

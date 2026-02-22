@@ -77,4 +77,23 @@ class ReceiptPrinterService {
       print('❌ Error print struk: $e');
     }
   }
+
+  static Future<void> openCashDrawer() async {
+    try {
+      final profile = await CapabilityProfile.load();
+      final printer = NetworkPrinter(PaperSize.mm80, profile);
+
+      final PosPrintResult connect =
+          await printer.connect(printerIp, port: printerPort);
+
+      if (connect != PosPrintResult.success) {
+        throw Exception('Failed to connect printer: $connect');
+      }
+
+      printer.drawer();
+      printer.disconnect();
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

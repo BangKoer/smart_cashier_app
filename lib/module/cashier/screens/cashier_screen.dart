@@ -8,9 +8,9 @@ import 'package:smart_cashier_app/models/product.dart';
 import 'package:smart_cashier_app/models/product_unit.dart';
 import 'package:smart_cashier_app/models/sales.dart' as sales_model;
 import 'package:smart_cashier_app/models/user.dart';
+import 'package:smart_cashier_app/module/cashier/services/cash_drawer_service.dart';
 import 'package:smart_cashier_app/module/cashier/services/cashier_services.dart';
 import 'package:collection/collection.dart';
-import 'package:smart_cashier_app/module/cashier/services/receipt_services.dart';
 import 'package:smart_cashier_app/providers/user_provider.dart';
 import 'package:smart_cashier_app/utils/format_rupiah.dart' as format;
 
@@ -28,6 +28,7 @@ class _CashierScreenState extends State<CashierScreen> {
   final TextEditingController _qtyController = TextEditingController();
   final TextEditingController _exchangeController = TextEditingController();
   final CashierServices cashierServices = CashierServices();
+  final CashDrawerService cashDrawerService = CashDrawerService();
   final TextEditingController _customerNameController = TextEditingController();
   final TextEditingController _searchProductsController =
       TextEditingController();
@@ -179,6 +180,21 @@ class _CashierScreenState extends State<CashierScreen> {
     );
   }
 
+  Future<void> _tryOpenCashDrawerAfterPayment() async {
+    final bool shouldOpenDrawer =
+        paymentStatus == 'paid' && paymentMethod == 'cash';
+    if (!shouldOpenDrawer) return;
+
+    final result = await cashDrawerService.openDrawer();
+    if (!result.isSuccess && mounted) {
+      showSnackBar(
+        context,
+        "Payment saved, but failed to open cash drawer: ${result.message}",
+        bgColor: Colors.orange,
+      );
+    }
+  }
+
   void _showConfirmsPayDialog() async {
     bool isLoading = false;
 
@@ -297,6 +313,9 @@ class _CashierScreenState extends State<CashierScreen> {
                                   ? await updateSales()
                                   : await createSales();
                               if (!mounted) return;
+                              if (isSuccess) {
+                                await _tryOpenCashDrawerAfterPayment();
+                              }
                               setState(() => isLoading = false);
                               Navigator.pop(context);
                               if (isSuccess && isEditMode && mounted) {
@@ -489,14 +508,20 @@ class _CashierScreenState extends State<CashierScreen> {
             isWideScreen: isWideScreen,
             onPressed: _showProductsDialog,
             icon: Icons.add_shopping_cart_rounded,
+            heroTag: 'cashier_add_product_fab',
           ),
           const SizedBox(width: 10),
           adaptiveFab(
             isWideScreen: isWideScreen,
             onPressed: () {},
             icon: Icons.qr_code,
+            heroTag: 'cashier_qr_fab',
           ),
         ],
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: _buildInputSection(context),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -525,36 +550,9 @@ class _CashierScreenState extends State<CashierScreen> {
 
           // ✅ BAGIAN KONTEN YANG BISA DISCROLL
           Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                bool isWide = constraints.maxWidth > 800;
-
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                    child: isWide
-                        ? Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                  flex: 2, child: _buildInputSection(context)),
-                              const SizedBox(width: 24),
-                              Expanded(
-                                  flex: 3, child: _buildTableSection(context)),
-                            ],
-                          )
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildInputSection(context),
-                              const SizedBox(height: 24),
-                              _buildTableSection(context),
-                            ],
-                          ),
-                  ),
-                );
-              },
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: _buildTableSection(context),
             ),
           ),
         ],
@@ -563,90 +561,191 @@ class _CashierScreenState extends State<CashierScreen> {
   }
 
   Widget _buildInputSection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text("Input Item & Payment",
-            style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 20),
-        Row(
+    final bool isWide = MediaQuery.of(context).size.width > 900;
+    return Material(
+      elevation: 12,
+      color: GlobalVariables.backgroundColor,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: isWide ? 16 : 12,
+          vertical: 12,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              flex: 3,
-              child: TextField(
-                controller: _barcodeController,
-                onSubmitted: (_) =>
-                    getProductByBarcode(_barcodeController.text),
-                decoration: const InputDecoration(
-                  labelText: "Scan / Input Barcode",
-                  border: OutlineInputBorder(),
-                ),
-              ),
+            Text(
+              "Input Item & Payment",
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              flex: 1,
-              child: TextField(
-                controller: _qtyController,
-                onSubmitted: (value) {
-                  getProductByBarcode(_barcodeController.text,
-                      qty: double.parse(_qtyController.text));
-                },
-                decoration: const InputDecoration(
-                  labelText: "Qty",
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.number,
+            const SizedBox(height: 10),
+            if (isWide)
+              Row(
+                children: [
+                  Expanded(
+                    flex: 4,
+                    child: TextField(
+                      controller: _barcodeController,
+                      onSubmitted: (_) =>
+                          getProductByBarcode(_barcodeController.text),
+                      decoration: const InputDecoration(
+                        labelText: "Scan / Input Barcode",
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 110,
+                    child: TextField(
+                      controller: _qtyController,
+                      onSubmitted: (_) {
+                        final qty =
+                            double.tryParse(_qtyController.text.trim()) ?? 1;
+                        getProductByBarcode(_barcodeController.text, qty: qty);
+                      },
+                      decoration: const InputDecoration(
+                        labelText: "Qty",
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () {
+                      final qty =
+                          double.tryParse(_qtyController.text.trim()) ?? 1;
+                      getProductByBarcode(_barcodeController.text, qty: qty);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                    ),
+                    child: const Text("Add"),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    flex: 3,
+                    child: TextField(
+                      controller: _exchangeController,
+                      onChanged: (value) {
+                        setState(() {
+                          final payout = double.tryParse(value.trim()) ?? 0.0;
+                          exchange = payout - totalPrice;
+                        });
+                      },
+                      onSubmitted: (_) => _showConfirmsPayDialog(),
+                      decoration: const InputDecoration(
+                        labelText: "Pay Amount",
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    onPressed: _showConfirmsPayDialog,
+                    icon: const Icon(Icons.payment),
+                    label: Text(isEditMode ? "Update Sale" : "Pay"),
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              )
+            else
+              Column(
+                children: [
+                  TextField(
+                    controller: _barcodeController,
+                    onSubmitted: (_) =>
+                        getProductByBarcode(_barcodeController.text),
+                    decoration: const InputDecoration(
+                      labelText: "Scan / Input Barcode",
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _qtyController,
+                          onSubmitted: (_) {
+                            final qty =
+                                double.tryParse(_qtyController.text.trim()) ??
+                                    1;
+                            getProductByBarcode(_barcodeController.text,
+                                qty: qty);
+                          },
+                          decoration: const InputDecoration(
+                            labelText: "Qty",
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      ElevatedButton(
+                        onPressed: () {
+                          final qty =
+                              double.tryParse(_qtyController.text.trim()) ?? 1;
+                          getProductByBarcode(_barcodeController.text,
+                              qty: qty);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(5),
+                          ),
+                        ),
+                        child: const Text("Add"),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: _exchangeController,
+                    onChanged: (value) {
+                      setState(() {
+                        final payout = double.tryParse(value.trim()) ?? 0.0;
+                        exchange = payout - totalPrice;
+                      });
+                    },
+                    onSubmitted: (_) => _showConfirmsPayDialog(),
+                    decoration: const InputDecoration(
+                      labelText: "Pay Amount",
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _showConfirmsPayDialog,
+                      icon: const Icon(Icons.payment),
+                      label: Text(isEditMode ? "Update Sale" : "Pay"),
+                      style: ElevatedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 46),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton(
-              onPressed: () => getProductByBarcode(_barcodeController.text,
-                  qty: double.parse(_qtyController.text)),
-              style: ElevatedButton.styleFrom(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text("Add"),
-            ),
           ],
         ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _exchangeController,
-          onChanged: (value) {
-            setState(() {
-              exchange = -(totalPrice - double.parse(value));
-            });
-          },
-          onSubmitted: (_) {
-            _showConfirmsPayDialog();
-          },
-          decoration: const InputDecoration(
-            labelText: "Pay Amount",
-            border: OutlineInputBorder(),
-          ),
-          keyboardType: TextInputType.number,
-        ),
-        const SizedBox(height: 20),
-        const Divider(),
-        const SizedBox(height: 10),
-        ElevatedButton.icon(
-          onPressed: _showConfirmsPayDialog,
-          icon: const Icon(Icons.payment),
-          label: Text(isEditMode ? "Update Sale" : "Pay"),
-          style: ElevatedButton.styleFrom(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(5),
-            ),
-            backgroundColor: Colors.green,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 50),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -654,10 +753,13 @@ class _CashierScreenState extends State<CashierScreen> {
     required bool isWideScreen,
     required VoidCallback onPressed,
     required IconData icon,
+    required String heroTag,
   }) {
-    return isWideScreen
-        ? FloatingActionButton.large(onPressed: onPressed, child: Icon(icon))
-        : FloatingActionButton(onPressed: onPressed, child: Icon(icon));
+    return FloatingActionButton(
+      heroTag: heroTag,
+      onPressed: onPressed,
+      child: Icon(icon),
+    );
   }
 
   Widget _buildTableSection(BuildContext context) {
@@ -670,111 +772,114 @@ class _CashierScreenState extends State<CashierScreen> {
               Text("Cart Items", style: Theme.of(context).textTheme.titleLarge),
         ),
         const SizedBox(height: 20),
-        Card(
-          elevation: 3,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.vertical,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Column(
-                  children: [
-                    DataTable(
-                      columns: const [
-                        DataColumn(label: Text("No")),
-                        DataColumn(label: Text("Nama Barang")),
-                        DataColumn(label: Text("Qty")),
-                        DataColumn(label: Text("Satuan")),
-                        DataColumn(label: Text("Harga")),
-                        DataColumn(label: Text("Total")),
-                        DataColumn(label: Text("Delete Action")),
-                      ],
-                      rows: cartItems.isEmpty
-                          ? [
-                              const DataRow(cells: [
-                                DataCell(Text('-')),
-                                DataCell(Text('Belum ada data')),
-                                DataCell(Text('-')),
-                                DataCell(Text('-')),
-                                DataCell(Text('-')),
-                                DataCell(Text('-')),
-                                DataCell(Text('-')),
-                              ]),
-                            ]
-                          : List.generate(
-                              cartItems.length,
-                              (index) {
-                                final item = cartItems[index];
-                                return DataRow(cells: [
-                                  DataCell(Text('${index + 1}')),
-                                  DataCell(Text(item.product.productName)),
-                                  // Input qty
-                                  DataCell(
-                                    SizedBox(
-                                      width: 50,
-                                      child: TextField(
-                                        keyboardType: TextInputType.number,
-                                        decoration: const InputDecoration(
-                                          border: InputBorder.none,
+        LayoutBuilder(
+          builder: (context, constraint) {
+            return Card(
+              elevation: 3,
+              shape:
+                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.vertical,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(minWidth: constraint.maxWidth),
+                      child: DataTable(
+                        columns: const [
+                          DataColumn(label: Text("No")),
+                          DataColumn(label: Text("Nama Barang")),
+                          DataColumn(label: Text("Qty")),
+                          DataColumn(label: Text("Satuan")),
+                          DataColumn(label: Text("Harga")),
+                          DataColumn(label: Text("Total")),
+                          DataColumn(label: Text("Delete Action")),
+                        ],
+                        rows: cartItems.isEmpty
+                            ? [
+                                const DataRow(cells: [
+                                  DataCell(Text('-')),
+                                  DataCell(Text('Belum ada data')),
+                                  DataCell(Text('-')),
+                                  DataCell(Text('-')),
+                                  DataCell(Text('-')),
+                                  DataCell(Text('-')),
+                                  DataCell(Text('-')),
+                                ]),
+                              ]
+                            : List.generate(
+                                cartItems.length,
+                                (index) {
+                                  final item = cartItems[index];
+                                  return DataRow(cells: [
+                                    DataCell(Text('${index + 1}')),
+                                    DataCell(Text(item.product.productName)),
+                                    // Input qty
+                                    DataCell(
+                                      SizedBox(
+                                        width: 50,
+                                        child: TextField(
+                                          keyboardType: TextInputType.number,
+                                          decoration: const InputDecoration(
+                                            border: InputBorder.none,
+                                          ),
+                                          controller: TextEditingController(
+                                            text: format.formatDouble(item.qty),
+                                          ),
+                                          onSubmitted: (val) {
+                                            setState(() {
+                                              item.qty = double.tryParse(val) ?? 0;
+                                            });
+                                          },
                                         ),
-                                        controller: TextEditingController(
-                                          text: format.formatDouble(item.qty),
-                                        ),
-                                        onSubmitted: (val) {
+                                      ),
+                                    ),
+                                    // 🧩 Dropdown satuan (ProductUnit)
+                                    DataCell(
+                                      DropdownButton<ProductUnit>(
+                                        value: item.selectedUnit,
+                                        items: item.product.units
+                                            .map(
+                                              (unit) => DropdownMenuItem(
+                                                value: unit,
+                                                child: Text(unit.nameUnit),
+                                              ),
+                                            )
+                                            .toList(),
+                                        onChanged: (unit) {
                                           setState(() {
-                                            item.qty = double.tryParse(val) ?? 0;
+                                            item.selectedUnit = unit;
                                           });
                                         },
                                       ),
                                     ),
-                                  ),
-                                  // 🧩 Dropdown satuan (ProductUnit)
-                                  DataCell(
-                                    DropdownButton<ProductUnit>(
-                                      value: item.selectedUnit,
-                                      items: item.product.units
-                                          .map(
-                                            (unit) => DropdownMenuItem(
-                                              value: unit,
-                                              child: Text(unit.nameUnit),
-                                            ),
-                                          )
-                                          .toList(),
-                                      onChanged: (unit) {
-                                        setState(() {
-                                          item.selectedUnit = unit;
-                                        });
-                                      },
+                                    DataCell(Text(format.toRupiah(
+                                        item.selectedUnit?.price ?? 0))),
+                                    DataCell(
+                                        Text(format.toRupiah(item.total))),
+                                    DataCell(
+                                      IconButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              cartItems.removeAt(index);
+                                            });
+                                          },
+                                          icon: const Icon(
+                                            Icons.delete,
+                                            color: Colors.red,
+                                          )),
                                     ),
-                                  ),
-                                  DataCell(Text(format.toRupiah(
-                                      item.selectedUnit?.price ?? 0))),
-                                  DataCell(
-                                      Text(format.toRupiah(item.total))),
-                                  DataCell(
-                                    IconButton(
-                                        onPressed: () {
-                                          setState(() {
-                                            cartItems.removeAt(index);
-                                          });
-                                        },
-                                        icon: const Icon(
-                                          Icons.delete,
-                                          color: Colors.red,
-                                        )),
-                                  ),
-                                ]);
-                              },
-                            ),
+                                  ]);
+                                },
+                              ),
+                      ),
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ),
+            );
+          }
         ),
       ],
     );
@@ -814,3 +919,4 @@ class CustomTextWidget extends StatelessWidget {
     );
   }
 }
+
