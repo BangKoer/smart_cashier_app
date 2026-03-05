@@ -34,6 +34,30 @@ class _ProdutcsScreenState extends State<ProdutcsScreen> {
   String _selectedSortFilter = 'name_asc';
   static const int _lowStockThreshold = 10;
 
+  double? _parseNumberInput(String value) {
+    var raw = value.trim();
+    if (raw.isEmpty) return null;
+
+    raw = raw.replaceAll(' ', '');
+
+    // Indonesian/common format support:
+    // 13.000,50 -> 13000.50
+    // 13,5 -> 13.5
+    // 13.000 -> 13000
+    if (raw.contains('.') && raw.contains(',')) {
+      raw = raw.replaceAll('.', '').replaceAll(',', '.');
+    } else if (raw.contains(',')) {
+      raw = raw.replaceAll(',', '.');
+    } else {
+      final thousandPattern = RegExp(r'^\d{1,3}(\.\d{3})+$');
+      if (thousandPattern.hasMatch(raw)) {
+        raw = raw.replaceAll('.', '');
+      }
+    }
+
+    return double.tryParse(raw);
+  }
+
   Future<void> _refreshProductsScreen() async {
     await getAllProduct();
     await getAllCategories();
@@ -192,15 +216,17 @@ class _ProdutcsScreenState extends State<ProdutcsScreen> {
 
                       final barcode = _barcodeController.text.trim();
                       final productName = _productNameController.text.trim();
-                      final stock = int.tryParse(_stockController.text.trim());
-                      final purchasedPrice = double.tryParse(
+                      final stockParsed =
+                          _parseNumberInput(_stockController.text.trim());
+                      final stock = stockParsed?.toInt();
+                      final purchasedPrice = _parseNumberInput(
                           _purchasedPriceController.text.trim());
                       final selectedCategory = id_category;
 
                       final units = <Map<String, dynamic>>[];
                       for (int i = 0; i < _unitControllers.length; i++) {
                         final unitName = _unitControllers[i].text.trim();
-                        final unitPrice = double.tryParse(
+                        final unitPrice = _parseNumberInput(
                             _unitPriceControllers[i].text.trim());
 
                         if (unitName.isEmpty || unitPrice == null) {

@@ -10,6 +10,7 @@ import 'package:smart_cashier_app/models/sales.dart' as sales_model;
 import 'package:smart_cashier_app/models/user.dart';
 import 'package:smart_cashier_app/module/cashier/services/cash_drawer_service.dart';
 import 'package:smart_cashier_app/module/cashier/services/cashier_services.dart';
+import 'package:smart_cashier_app/module/cashier/widgets/cart_discount_input.dart';
 import 'package:collection/collection.dart';
 import 'package:smart_cashier_app/providers/user_provider.dart';
 import 'package:smart_cashier_app/utils/format_rupiah.dart' as format;
@@ -50,6 +51,10 @@ class _CashierScreenState extends State<CashierScreen> {
     return double.tryParse(_exchangeController.text.trim()) ?? 0.0;
   }
 
+  Future<void> _refreshProductsAfterTransaction() async {
+    await cashierServices.fetchAllProducts(context: context);
+  }
+
   Future<bool> createSales() async {
     final isSuccess = await cashierServices.createSales(
       context: context,
@@ -68,6 +73,8 @@ class _CashierScreenState extends State<CashierScreen> {
     // );
 
     if (isSuccess && mounted) {
+      await _refreshProductsAfterTransaction();
+      if (!mounted) return isSuccess;
       setState(() {
         cartItems.clear();
         _exchangeController.clear();
@@ -92,6 +99,8 @@ class _CashierScreenState extends State<CashierScreen> {
     );
 
     if (isSuccess && mounted) {
+      await _refreshProductsAfterTransaction();
+      if (!mounted) return isSuccess;
       setState(() {
         cartItems.clear();
         _exchangeController.clear();
@@ -129,6 +138,13 @@ class _CashierScreenState extends State<CashierScreen> {
           product: product,
           qty: item.quantity <= 0 ? 1 : item.quantity,
           selectedUnit: selectedUnit,
+          discountPercent: item.discount_percent > 0
+              ? item.discount_percent
+              : null,
+          discountAmountInput:
+              item.discount_percent <= 0 && item.discount_amount > 0
+                  ? item.discount_amount
+                  : null,
         ),
       );
     }
@@ -793,6 +809,8 @@ class _CashierScreenState extends State<CashierScreen> {
                           DataColumn(label: Text("Qty")),
                           DataColumn(label: Text("Satuan")),
                           DataColumn(label: Text("Harga")),
+                          DataColumn(label: Text("Disc %")),
+                          DataColumn(label: Text("Disc Rp")),
                           DataColumn(label: Text("Total")),
                           DataColumn(label: Text("Delete Action")),
                         ],
@@ -801,6 +819,8 @@ class _CashierScreenState extends State<CashierScreen> {
                                 const DataRow(cells: [
                                   DataCell(Text('-')),
                                   DataCell(Text('Belum ada data')),
+                                  DataCell(Text('-')),
+                                  DataCell(Text('-')),
                                   DataCell(Text('-')),
                                   DataCell(Text('-')),
                                   DataCell(Text('-')),
@@ -857,7 +877,28 @@ class _CashierScreenState extends State<CashierScreen> {
                                     DataCell(Text(format.toRupiah(
                                         item.selectedUnit?.price ?? 0))),
                                     DataCell(
-                                        Text(format.toRupiah(item.total))),
+                                      CartDiscountInput(
+                                        cartItem: item,
+                                        mode: DiscountInputMode.percent,
+                                        inputKey: Key(
+                                            'discount_percent_input_$index'),
+                                        onChanged: () => setState(() {}),
+                                      ),
+                                    ),
+                                    DataCell(
+                                      CartDiscountInput(
+                                        cartItem: item,
+                                        mode: DiscountInputMode.amount,
+                                        inputKey:
+                                            Key('discount_amount_input_$index'),
+                                        onChanged: () => setState(() {}),
+                                      ),
+                                    ),
+                                    DataCell(
+                                        Text(
+                                      format.toRupiah(item.total),
+                                      key: Key('cart_total_text_$index'),
+                                    )),
                                     DataCell(
                                       IconButton(
                                           onPressed: () {

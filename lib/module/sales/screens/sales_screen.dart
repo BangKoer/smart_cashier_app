@@ -177,9 +177,11 @@ class _SalesState extends State<Sales> {
                       ),
                       columns: const [
                         DataColumn(label: Text("Product")),
-                        DataColumn(label: Text("Unit")),
                         DataColumn(label: Text("Qty")),
-                        DataColumn(label: Text("Unit Price")),
+                        DataColumn(label: Text("Unit")),
+                        DataColumn(label: Text("Price Unit")),
+                        DataColumn(label: Text("Discount %")),
+                        DataColumn(label: Text("Discount Amount")),
                         DataColumn(label: Text("Sub Total")),
                       ],
                       rows: List.generate(
@@ -193,6 +195,9 @@ class _SalesState extends State<Sales> {
                                 DataCell(Text('-')),
                                 DataCell(Text('-')),
                                 DataCell(Text('No sale items')),
+                                DataCell(Text('-')),
+                                DataCell(Text('-')),
+                                DataCell(Text('-')),
                               ],
                             );
                           }
@@ -202,11 +207,13 @@ class _SalesState extends State<Sales> {
                             cells: [
                               DataCell(Text(item.product_name ??
                                   'Product #${item.id_product}')),
+                              DataCell(Text(_formatQty(item.quantity))),
                               DataCell(Text(item.product_unit ??
                                   'Unit #${item.id_product_unit}')),
-                              DataCell(Text(_formatQty(item.quantity))),
                               DataCell(
-                                  Text(format.toRupiah(item.unit_price ?? 0))),
+                                  Text(format.toRupiah(item.unit_price_snapshot))),
+                              DataCell(Text("${_formatQty(item.discount_percent)} %")),
+                              DataCell(Text(format.toRupiah(item.discount_amount))),
                               DataCell(Text(format.toRupiah(item.sub_total))),
                             ],
                           );
@@ -330,7 +337,8 @@ class _SalesState extends State<Sales> {
                 isDense: true,
               ),
               items: const [
-                DropdownMenuItem(value: 'date_desc', child: Text("Date Newest")),
+                DropdownMenuItem(
+                    value: 'date_desc', child: Text("Date Newest")),
                 DropdownMenuItem(value: 'date_asc', child: Text("Date Oldest")),
                 DropdownMenuItem(
                     value: 'total_desc', child: Text("Total High-Low")),
@@ -393,7 +401,6 @@ class _SalesState extends State<Sales> {
                 dataRowMinHeight: 48,
                 dataRowMaxHeight: double.infinity,
                 columns: const [
-                  DataColumn(label: Text("No")),
                   DataColumn(label: Text("Date")),
                   DataColumn(label: Text("Customer")),
                   DataColumn(label: Text("Payment")),
@@ -407,7 +414,6 @@ class _SalesState extends State<Sales> {
                       return const DataRow(
                         cells: [
                           DataCell(Text('-')),
-                          DataCell(Text('-')),
                           DataCell(Text('No sales found')),
                           DataCell(Text('-')),
                           DataCell(Text('-')),
@@ -419,7 +425,6 @@ class _SalesState extends State<Sales> {
                     final sales = list[index];
                     return DataRow(
                       cells: [
-                        DataCell(Text('${index + 1}')),
                         DataCell(Text(_formatDate(sales.created_at))),
                         DataCell(Text((sales.customer_name == null ||
                                 sales.customer_name!.isEmpty)
@@ -455,22 +460,22 @@ class _SalesState extends State<Sales> {
                                 ),
                               ),
                               const SizedBox(width: 5),
-                          IconButton(
-                            onPressed: () async {
-                              final isUpdated = await Navigator.push<bool>(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => CashierScreen(
-                                    editingSale: sales,
-                                  ),
-                                ),
-                              );
-                              if (isUpdated == true && mounted) {
-                                _fetchSales();
-                              }
-                            },
-                            icon: const Icon(Icons.edit),
-                            style: IconButton.styleFrom(
+                              IconButton(
+                                onPressed: () async {
+                                  final isUpdated = await Navigator.push<bool>(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => CashierScreen(
+                                        editingSale: sales,
+                                      ),
+                                    ),
+                                  );
+                                  if (isUpdated == true && mounted) {
+                                    _fetchSales();
+                                  }
+                                },
+                                icon: const Icon(Icons.edit),
+                                style: IconButton.styleFrom(
                                   backgroundColor: Colors.yellow,
                                   foregroundColor: Colors.black,
                                   shape: const RoundedRectangleBorder(

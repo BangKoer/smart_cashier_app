@@ -24,8 +24,21 @@ const SaleItem = sequelize.define(
       allowNull: false,
     },
     quantity: {
-      type: DataTypes.FLOAT,
+      type: DataTypes.DECIMAL(10, 1),
       allowNull: false,
+    },
+    unit_price_snapshot: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+    },
+    discount_percent: {
+      type: DataTypes.DECIMAL(10, 1),
+      allowNull: true,
+      field: "discount_%",
+    },
+    discount_amount: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
     },
     sub_total: {
       type: DataTypes.DECIMAL(10, 2),

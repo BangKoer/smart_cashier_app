@@ -11,6 +11,10 @@ import 'package:http/http.dart' as http;
 import 'package:smart_cashier_app/providers/user_provider.dart';
 
 class CashierServices {
+  double _roundTo(double value, int fractionDigits) {
+    return double.parse(value.toStringAsFixed(fractionDigits));
+  }
+
   Future<bool> createSales({
     required BuildContext context,
     required List<CartItem> cartItems,
@@ -23,22 +27,25 @@ class CashierServices {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     bool isSuccess = false;
     try {
-      // Ubah item dalam CartItem jadi bentuk yang bisa di POST Ke Backend
-      final List<Map<String, dynamic>> items = cartItems.map(
-        (item) {
-          return {
-            "id_product": item.product.id,
-            "id_product_unit": item.selectedUnit?.id ?? 1,
-            "quantity": item.qty,
-            "sub_total": item.total,
-          };
-        },
-      ).toList();
+      final List<Map<String, dynamic>> items = cartItems.map((item) {
+        final unitPriceSnapshot = item.unitPriceSnapshot;
+        return {
+          "id_product": item.product.id,
+          "id_product_unit": item.selectedUnit?.id ?? 1,
+          "quantity": _roundTo(item.qty, 3),
+          "unit_price_snapshot": _roundTo(unitPriceSnapshot, 2),
+          "discount_percent": item.discountPercentForPayload == null
+              ? null
+              : _roundTo(item.discountPercentForPayload!, 1),
+          "discount_amount": _roundTo(item.discountAmount, 2),
+          "sub_total": _roundTo(item.total, 2),
+        };
+      }).toList();
 
       final Map<String, dynamic> bodyPost = {
         "id_user": userProvider.user.id, // atau sesuai field usermu
-        "total_price": totalPrice,
-        "total_payout": totalPayout ?? totalPrice,
+        "total_price": _roundTo(totalPrice, 2),
+        "total_payout": _roundTo(totalPayout ?? totalPrice, 2),
         "payment_method": paymentMethod,
         "payment_status": paymentStatus,
         "customer_name": customerName,
@@ -90,21 +97,25 @@ class CashierServices {
     final userProvider = Provider.of<UserProvider>(context, listen: false).user;
     bool isSuccess = false;
     try {
-      final List<Map<String, dynamic>> items = cartItems.map(
-        (item) {
-          return {
-            "id_product": item.product.id,
-            "id_product_unit": item.selectedUnit?.id ?? 1,
-            "quantity": item.qty,
-            "sub_total": item.total,
-          };
-        },
-      ).toList();
+      final List<Map<String, dynamic>> items = cartItems.map((item) {
+        final unitPriceSnapshot = item.unitPriceSnapshot;
+        return {
+          "id_product": item.product.id,
+          "id_product_unit": item.selectedUnit?.id ?? 1,
+          "quantity": _roundTo(item.qty, 3),
+          "unit_price_snapshot": _roundTo(unitPriceSnapshot, 2),
+          "discount_percent": item.discountPercentForPayload == null
+              ? null
+              : _roundTo(item.discountPercentForPayload!, 1),
+          "discount_amount": _roundTo(item.discountAmount, 2),
+          "sub_total": _roundTo(item.total, 2),
+        };
+      }).toList();
 
       final Map<String, dynamic> bodyPut = {
         "id_user": userProvider.id,
-        "total_price": totalPrice,
-        "total_payout": totalPayout ?? totalPrice,
+        "total_price": _roundTo(totalPrice, 2),
+        "total_payout": _roundTo(totalPayout ?? totalPrice, 2),
         "payment_method": paymentMethod,
         "payment_status": paymentStatus,
         "customer_name": customerName,

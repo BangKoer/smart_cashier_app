@@ -182,13 +182,35 @@ productRouter.put('/api/products/:id', auth, async (req, res) => {
             }
         );
 
-        // Simpler and safer for now: replace all units on every edit.
-        await ProductUnit.destroy({
+        // IMPORTANT:
+        // Do not delete + recreate units, because sale items reference unit IDs.
+        // Instead, update existing rows in-place (preserve IDs), and only create new ones if needed.
+        const existingUnits = await ProductUnit.findAll({
             where: { id_product: Number(id) },
+            order: [['id', 'ASC']],
             transaction: t,
         });
 
-        await ProductUnit.bulkCreate(unitPayload, { transaction: t });
+        for (let i = 0; i < unitPayload.length; i++) {
+            const incomingUnit = unitPayload[i];
+            const existingUnit = existingUnits[i];
+
+            if (existingUnit) {
+                await ProductUnit.update(
+                    {
+                        name_unit: incomingUnit.name_unit,
+                        price: incomingUnit.price,
+                        conversion: incomingUnit.conversion,
+                    },
+                    {
+                        where: { id: existingUnit.id },
+                        transaction: t,
+                    }
+                );
+            } else {
+                await ProductUnit.create(incomingUnit, { transaction: t });
+            }
+        }
 
         await t.commit();
 

@@ -6,22 +6,27 @@ class Saleitems {
   final int id_product;
   final int id_product_unit;
   final double quantity;
+  final double unit_price_snapshot;
+  final double discount_percent;
+  final double discount_amount;
   final double sub_total;
   final String? product_name;
   final String? product_unit;
   final double? unit_price;
 
-  Saleitems({
-    required this.id,
-    required this.id_sales,
-    required this.id_product,
-    required this.id_product_unit,
-    required this.quantity,
-    required this.sub_total,
-    this.product_name,
-    this.product_unit,
-    this.unit_price,
-  });
+  Saleitems(
+      {required this.id,
+      required this.id_sales,
+      required this.id_product,
+      required this.id_product_unit,
+      required this.quantity,
+      required this.unit_price_snapshot,
+      required this.discount_percent,
+      required this.discount_amount,
+      required this.sub_total,
+      this.product_name,
+      this.product_unit,
+      this.unit_price});
 
   Map<String, dynamic> toMap() {
     return {
@@ -30,6 +35,9 @@ class Saleitems {
       'id_product': id_product,
       'id_product_unit': id_product_unit,
       'quantity': quantity,
+      'unit_price_snapshot': unit_price_snapshot,
+      'discount_percent': discount_percent,
+      'discount_amount': discount_amount,
       'sub_total': sub_total,
       // Optional display fields, useful for UI payloads.
       'product_name': product_name,
@@ -51,6 +59,22 @@ class Saleitems {
             (map['quantity'] ?? map['qty'] ?? 0).toString(),
           ) ??
           0.0,
+      unit_price_snapshot: double.tryParse(
+            (map['unit_price_snapshot'] ??
+                    map['unit_price'] ??
+                    (unitMap is Map ? unitMap['price'] : null) ??
+                    0)
+                .toString(),
+          ) ??
+          0.0,
+      discount_percent: double.tryParse(
+            (map['discount_percent'] ?? map['discount_%'] ?? 0).toString(),
+          ) ??
+          0.0,
+      discount_amount: double.tryParse(
+            (map['discount_amount'] ?? 0).toString(),
+          ) ??
+          0.0,
       sub_total: double.tryParse(
             (map['sub_total'] ?? 0).toString(),
           ) ??
@@ -60,9 +84,7 @@ class Saleitems {
       product_unit: map['product_unit']?.toString() ??
           (unitMap is Map ? unitMap['name_unit']?.toString() : null),
       unit_price: double.tryParse(
-        (map['unit_price'] ??
-                (unitMap is Map ? unitMap['price'] : null) ??
-                0)
+        (map['unit_price'] ?? (unitMap is Map ? unitMap['price'] : null) ?? 0)
             .toString(),
       ),
     );

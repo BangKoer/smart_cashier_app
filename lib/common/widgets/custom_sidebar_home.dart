@@ -16,16 +16,16 @@ class CustomSidebarHome extends StatefulWidget {
 
 class _CustomSidebarHomeState extends State<CustomSidebarHome> {
   int _page = 0;
-  late final List<Widget> _pages;
+  late List<Widget> _pages;
 
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
-    _pages = const [
-      CashierScreen(),
-      ProdutcsScreen(),
-      Sales(),
+    _pages = [
+      const CashierScreen(),
+      const ProdutcsScreen(),
+      const Sales(),
     ];
   }
 
@@ -121,6 +121,10 @@ class _CustomSidebarHomeState extends State<CustomSidebarHome> {
       onTap: () {
         print('Navigating to page $index');
         setState(() {
+          if (index == 1) {
+            // Force Product tab to recreate so initState fetches latest stock.
+            _pages[1] = ProdutcsScreen(key: UniqueKey());
+          }
           _page = index;
         });
         if (MediaQuery.of(context).size.width < 700) {

@@ -76,6 +76,7 @@ class SalesServices {
     required int id,
     required int idUser,
     required double totalPrice,
+    double? totalPayout,
     required String paymentMethod,
     required String paymentStatus,
     required String customerName,
@@ -89,6 +90,9 @@ class SalesServices {
           "id_product": item["id_product"],
           "id_product_unit": item["id_product_unit"],
           "quantity": item["quantity"],
+          "unit_price_snapshot": item["unit_price_snapshot"],
+          "discount_percent": item["discount_percent"],
+          "discount_amount": item["discount_amount"],
           "sub_total": item["sub_total"],
         };
       }).toList();
@@ -96,6 +100,7 @@ class SalesServices {
       final Map<String, dynamic> bodyPut = {
         "id_user": idUser,
         "total_price": totalPrice,
+        "total_payout": totalPayout ?? totalPrice,
         "payment_method": paymentMethod,
         "payment_status": paymentStatus,
         "customer_name": customerName,
