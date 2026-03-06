@@ -31,6 +31,10 @@ const SaleItem = sequelize.define(
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
     },
+    cogs_snapshot: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+    },
     discount_percent: {
       type: DataTypes.DECIMAL(10, 1),
       allowNull: true,

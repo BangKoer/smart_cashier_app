@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:smart_cashier_app/constant/global_variables.dart';
 import 'package:smart_cashier_app/module/cashier/screens/cashier_screen.dart';
+import 'package:smart_cashier_app/module/report/screens/report_screen.dart';
 import 'package:smart_cashier_app/module/sales/screens/sales_screen.dart';
 import 'package:smart_cashier_app/module/products/screens/produtcs_screen.dart';
 import 'package:smart_cashier_app/providers/user_provider.dart';
@@ -26,6 +27,7 @@ class _CustomSidebarHomeState extends State<CustomSidebarHome> {
       const CashierScreen(),
       const ProdutcsScreen(),
       const Sales(),
+      const ReportScreen(),
     ];
   }
 
@@ -58,6 +60,7 @@ class _CustomSidebarHomeState extends State<CustomSidebarHome> {
           _buildDrawerItem(Icons.point_of_sale, "Cashier", 0),
           _buildDrawerItem(Icons.inventory, "Product", 1),
           _buildDrawerItem(Icons.file_copy, "Purchased Note", 2),
+          _buildDrawerItem(Icons.analytics, "Sales Report", 3),
         ],
       ),
     );

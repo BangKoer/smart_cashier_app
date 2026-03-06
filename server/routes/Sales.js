@@ -24,6 +24,7 @@ const buildSaleItemPayload = (rawItem, salesId) => {
             ? Number(rawItem.sub_total) / Number(rawItem.quantity)
             : NaN)
     );
+    const cogsSnapshot = normalizeMoney(rawItem.cogs_snapshot);
 
     const discountPercent =
         rawItem.discount_percent === null || rawItem.discount_percent === undefined
@@ -43,6 +44,7 @@ const buildSaleItemPayload = (rawItem, salesId) => {
         id_product_unit: rawItem.id_product_unit,
         quantity,
         unit_price_snapshot: unitPriceSnapshot,
+        cogs_snapshot: cogsSnapshot,
         discount_percent: discountPercent,
         discount_amount: discountAmount,
         sub_total: subTotal,
@@ -55,12 +57,18 @@ const isInvalidSaleItem = (item) => {
         !item.id_product_unit ||
         Number.isNaN(item.quantity) ||
         Number.isNaN(item.unit_price_snapshot) ||
+        Number.isNaN(item.cogs_snapshot) ||
         Number.isNaN(item.sub_total)
     ) {
         return true;
     }
 
-    if (item.quantity <= 0 || item.unit_price_snapshot < 0 || item.sub_total < 0) {
+    if (
+        item.quantity <= 0 ||
+        item.unit_price_snapshot < 0 ||
+        item.cogs_snapshot < 0 ||
+        item.sub_total < 0
+    ) {
         return true;
     }
 
@@ -338,6 +346,92 @@ salesRoute.get('/api/sales', auth, async (req, res) => {
     }
 });
 
+// Sales KPI summary
+salesRoute.get('/api/sales/kpi-summary', auth, async (req, res) => {
+    try {
+        const { date_from, date_to, payment_status } = req.query;
+        const allowedPaymentStatus = ["paid", "pending"];
+
+        if (
+            payment_status &&
+            !allowedPaymentStatus.includes(String(payment_status).toLowerCase())
+        ) {
+            return res.status(400).json({
+                msg: "Invalid payment_status. Allowed values: paid, pending",
+            });
+        }
+
+        const whereSales = [];
+        const whereItemSales = [];
+        const replacements = {};
+
+        if (date_from) {
+            whereSales.push("DATE(s.created_at) >= :date_from");
+            whereItemSales.push("DATE(s.created_at) >= :date_from");
+            replacements.date_from = date_from;
+        }
+
+        if (date_to) {
+            whereSales.push("DATE(s.created_at) <= :date_to");
+            whereItemSales.push("DATE(s.created_at) <= :date_to");
+            replacements.date_to = date_to;
+        }
+
+        if (payment_status) {
+            whereSales.push("s.payment_status = :payment_status");
+            whereItemSales.push("s.payment_status = :payment_status");
+            replacements.payment_status = String(payment_status).toLowerCase();
+        }
+
+        const whereSalesSql = whereSales.length > 0 ? `WHERE ${whereSales.join(" AND ")}` : "";
+        const whereItemSalesSql = whereItemSales.length > 0 ? `WHERE ${whereItemSales.join(" AND ")}` : "";
+
+        const sql = `
+            SELECT
+                (
+                    SELECT COUNT(*)
+                    FROM tb_sales s
+                    ${whereSalesSql}
+                ) AS total_transaction,
+                (
+                    SELECT COALESCE(SUM(s.total_price), 0)
+                    FROM tb_sales s
+                    ${whereSalesSql}
+                ) AS total_sales,
+                (
+                    SELECT COALESCE(SUM(si.sub_total - (si.cogs_snapshot * si.quantity)), 0)
+                    FROM tb_sale_item si
+                    INNER JOIN tb_sales s ON s.id = si.id_sales
+                    ${whereItemSalesSql}
+                ) AS total_profit
+        `;
+
+        const [rows] = await Sales.sequelize.query(sql, { replacements });
+        const row = rows?.[0] ?? {};
+
+        const totalTransaction = Number(row.total_transaction ?? 0);
+        const totalSales = normalizeMoney(row.total_sales ?? 0);
+        const totalProfit = normalizeMoney(row.total_profit ?? 0);
+        const avgTransactionValue = totalTransaction > 0
+            ? normalizeMoney(totalSales / totalTransaction)
+            : 0;
+
+        return res.status(200).json({
+            total_transaction: totalTransaction,
+            total_sales: totalSales,
+            total_profit: totalProfit,
+            avg_transaction_value: avgTransactionValue,
+            filters: {
+                date_from: date_from ?? null,
+                date_to: date_to ?? null,
+                payment_status: payment_status ?? "all",
+            },
+        });
+    } catch (e) {
+        return res.status(500).json({ error: e.message });
+    }
+});
+
 // Get sales detail by id
 salesRoute.get('/api/sales/:id', auth, async (req, res) => {
     try {
@@ -366,6 +460,8 @@ salesRoute.get('/api/sales/:id', auth, async (req, res) => {
         return res.status(500).json({ error: e.message });
     }
 });
+
+
 
 // Delete sales and its sale items
 salesRoute.delete('/api/sales/:id', auth, async (req, res) => {

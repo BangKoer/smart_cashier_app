@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:smart_cashier_app/common/widgets/custom_sidebar_home.dart';
 import 'package:smart_cashier_app/module/auth/screens/auth_screen.dart';
 import 'package:smart_cashier_app/module/home/screens/home_screen.dart';
+import 'package:smart_cashier_app/module/report/screens/report_screen.dart';
 import 'package:smart_cashier_app/module/sales/screens/sales_screen.dart';
 
 Route<dynamic> generateRoute(RouteSettings routeSettings) {
@@ -21,6 +22,10 @@ Route<dynamic> generateRoute(RouteSettings routeSettings) {
     case Sales.routeName:
       return MaterialPageRoute(
         builder: (_) => const Sales(),
+      );
+    case ReportScreen.routeName:
+      return MaterialPageRoute(
+        builder: (_) => const ReportScreen(),
       );
     default:
       return MaterialPageRoute(

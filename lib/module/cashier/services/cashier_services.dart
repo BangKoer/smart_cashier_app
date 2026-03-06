@@ -34,6 +34,7 @@ class CashierServices {
           "id_product_unit": item.selectedUnit?.id ?? 1,
           "quantity": _roundTo(item.qty, 3),
           "unit_price_snapshot": _roundTo(unitPriceSnapshot, 2),
+          "cogs_snapshot": _roundTo(item.product.purchasedPrice, 2),
           "discount_percent": item.discountPercentForPayload == null
               ? null
               : _roundTo(item.discountPercentForPayload!, 1),
@@ -104,6 +105,7 @@ class CashierServices {
           "id_product_unit": item.selectedUnit?.id ?? 1,
           "quantity": _roundTo(item.qty, 3),
           "unit_price_snapshot": _roundTo(unitPriceSnapshot, 2),
+          "cogs_snapshot": _roundTo(item.product.purchasedPrice, 2),
           "discount_percent": item.discountPercentForPayload == null
               ? null
               : _roundTo(item.discountPercentForPayload!, 1),
