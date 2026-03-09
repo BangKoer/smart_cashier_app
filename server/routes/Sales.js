@@ -432,6 +432,125 @@ salesRoute.get('/api/sales/kpi-summary', auth, async (req, res) => {
     }
 });
 
+// Sales time-series summary for chart
+salesRoute.get('/api/sales/chart-series', auth, async (req, res) => {
+    try {
+        const { date_from, date_to, payment_status, group_by } = req.query;
+        const allowedPaymentStatus = ["paid", "pending"];
+        const allowedGroupBy = ["day", "week", "month"];
+
+        if (
+            payment_status &&
+            !allowedPaymentStatus.includes(String(payment_status).toLowerCase())
+        ) {
+            return res.status(400).json({
+                msg: "Invalid payment_status. Allowed values: paid, pending",
+            });
+        }
+
+        if (
+            group_by &&
+            !allowedGroupBy.includes(String(group_by).toLowerCase())
+        ) {
+            return res.status(400).json({
+                msg: "Invalid group_by. Allowed values: day, week, month",
+            });
+        }
+
+        let resolvedGroupBy = group_by ? String(group_by).toLowerCase() : "";
+        if (!resolvedGroupBy) {
+            if (date_from && date_to) {
+                const from = new Date(`${date_from}T00:00:00`);
+                const to = new Date(`${date_to}T00:00:00`);
+                const diffMs = to.getTime() - from.getTime();
+                const diffDays = Number.isFinite(diffMs)
+                    ? Math.floor(diffMs / (1000 * 60 * 60 * 24))
+                    : 0;
+
+                if (diffDays > 31 && diffDays <= 366) {
+                    resolvedGroupBy = "week";
+                } else if (diffDays > 366) {
+                    resolvedGroupBy = "month";
+                } else {
+                    resolvedGroupBy = "day";
+                }
+            } else {
+                resolvedGroupBy = "day";
+            }
+        }
+
+        const replacements = {};
+        const where = [];
+
+        if (date_from) {
+            where.push("DATE(s.created_at) >= :date_from");
+            replacements.date_from = date_from;
+        }
+        if (date_to) {
+            where.push("DATE(s.created_at) <= :date_to");
+            replacements.date_to = date_to;
+        }
+        if (payment_status) {
+            where.push("s.payment_status = :payment_status");
+            replacements.payment_status = String(payment_status).toLowerCase();
+        }
+        const whereSql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+
+        let periodLabelExpr = "DATE_FORMAT(s.created_at, '%Y-%m-%d')";
+        let periodSortExpr = "DATE(s.created_at)";
+
+        if (resolvedGroupBy === "week") {
+            periodLabelExpr =
+                "DATE_FORMAT(DATE_SUB(s.created_at, INTERVAL WEEKDAY(s.created_at) DAY), '%Y-%m-%d')";
+            periodSortExpr =
+                "DATE_SUB(DATE(s.created_at), INTERVAL WEEKDAY(s.created_at) DAY)";
+        } else if (resolvedGroupBy === "month") {
+            periodLabelExpr = "DATE_FORMAT(s.created_at, '%Y-%m')";
+            periodSortExpr = "DATE_FORMAT(s.created_at, '%Y-%m-01')";
+        }
+
+        const sql = `
+            SELECT
+                ${periodLabelExpr} AS label,
+                MIN(${periodSortExpr}) AS sort_key,
+                COALESCE(SUM(s.total_price), 0) AS total_sales,
+                COUNT(s.id) AS total_transaction,
+                COALESCE(SUM(COALESCE(sp.sale_profit, 0)), 0) AS total_profit
+            FROM tb_sales s
+            LEFT JOIN (
+                SELECT
+                    si.id_sales,
+                    SUM(si.sub_total - (si.cogs_snapshot * si.quantity)) AS sale_profit
+                FROM tb_sale_item si
+                GROUP BY si.id_sales
+            ) sp ON sp.id_sales = s.id
+            ${whereSql}
+            GROUP BY ${periodLabelExpr}
+            ORDER BY sort_key ASC
+        `;
+
+        const [rows] = await Sales.sequelize.query(sql, { replacements });
+        const points = (rows ?? []).map((row) => ({
+            label: row.label,
+            total_sales: normalizeMoney(row.total_sales ?? 0),
+            total_profit: normalizeMoney(row.total_profit ?? 0),
+            total_transaction: Number(row.total_transaction ?? 0),
+        }));
+
+        return res.status(200).json({
+            group_by: resolvedGroupBy,
+            points,
+            filters: {
+                date_from: date_from ?? null,
+                date_to: date_to ?? null,
+                payment_status: payment_status ?? "all",
+            },
+        });
+    } catch (e) {
+        return res.status(500).json({ error: e.message });
+    }
+});
+
 // Get sales detail by id
 salesRoute.get('/api/sales/:id', auth, async (req, res) => {
     try {

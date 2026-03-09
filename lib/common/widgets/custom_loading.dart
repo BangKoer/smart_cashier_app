@@ -9,16 +9,11 @@ class CustomLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: double.infinity,
-      width: double.infinity,
-      color: Colors.white,
-      child: Center(
-        child: LoadingAnimationWidget.inkDrop(
-          color: GlobalVariables.thirdColor,
-          size: 50,
-        ),
+    return Center(
+      child: LoadingAnimationWidget.inkDrop(
+        color: GlobalVariables.thirdColor,
+        size: 50,
       ),
-    );  
+    );
   }
 }

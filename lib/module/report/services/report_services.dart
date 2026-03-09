@@ -79,6 +79,86 @@ class ReportServices {
     return result;
   }
 
+  Future<Map<String, dynamic>> fetchSalesSeries({
+    required BuildContext context,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    String? paymentStatus, // paid | pending | null (all)
+    String? groupBy, // day | week | month | null (auto)
+  }) async {
+    final userProvider = Provider.of<UserProvider>(context, listen: false).user;
+
+    final queryParameters = <String, String>{};
+    if (dateFrom != null) {
+      queryParameters['date_from'] = _formatDate(dateFrom);
+    }
+    if (dateTo != null) {
+      queryParameters['date_to'] = _formatDate(dateTo);
+    }
+    if (paymentStatus != null && paymentStatus.isNotEmpty) {
+      queryParameters['payment_status'] = paymentStatus.toLowerCase();
+    }
+    if (groupBy != null && groupBy.isNotEmpty) {
+      queryParameters['group_by'] = groupBy.toLowerCase();
+    }
+
+    final uri = Uri.parse('$baseUrl/api/sales/chart-series').replace(
+      queryParameters: queryParameters.isEmpty ? null : queryParameters,
+    );
+
+    Map<String, dynamic> result = {
+      "group_by": "day",
+      "points": <Map<String, dynamic>>[],
+      "filters": {
+        "date_from": null,
+        "date_to": null,
+        "payment_status": "all",
+      },
+    };
+
+    try {
+      final res = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'x-auth-token': userProvider.token,
+        },
+      );
+
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+          final pointsRaw = (decoded["points"] as List?) ?? const [];
+          final points = pointsRaw
+              .whereType<Map<String, dynamic>>()
+              .map((item) => {
+                    "label": item["label"]?.toString() ?? "",
+                    "total_sales":
+                        (item["total_sales"] as num?)?.toDouble() ?? 0.0,
+                    "total_profit":
+                        (item["total_profit"] as num?)?.toDouble() ?? 0.0,
+                    "total_transaction":
+                        (item["total_transaction"] as num?)?.toInt() ?? 0,
+                  })
+              .toList();
+
+          result = {
+            "group_by": decoded["group_by"]?.toString() ?? "day",
+            "points": points,
+            "filters": decoded["filters"] ?? result["filters"],
+          };
+        },
+      );
+    } catch (e) {
+      debugPrint(e.toString());
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
+    }
+
+    return result;
+  }
+
   String _formatDate(DateTime date) {
     final year = date.year.toString().padLeft(4, '0');
     final month = date.month.toString().padLeft(2, '0');
