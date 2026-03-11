@@ -264,7 +264,7 @@ salesRoute.put('/api/sales/:id', auth, async (req, res) => {
 
         await SaleItem.bulkCreate(saleItems, { transaction: t });
 
-        
+
         const oldMap = new Map();
         for (const it of existingItems) {
             const pid = Number(it.id_product);
@@ -550,6 +550,114 @@ salesRoute.get('/api/sales/chart-series', auth, async (req, res) => {
         return res.status(500).json({ error: e.message });
     }
 });
+
+// Total Sales per Category
+salesRoute.get('/api/sales/category-sales', auth, async (req, res) => {
+    try {
+        const { date_from, date_to, payment_status } = req.query;
+        const allowedPaymentStatus = ['paid', 'pending'];
+
+        if (payment_status && !allowedPaymentStatus.includes(String(payment_status).toLowerCase())) {
+            return res.status(404).json({
+                msg: "Invalid payment status. Allowed values: " + allowedPaymentStatus
+            });
+        }
+
+        const where = [];
+        const replacements = {};
+
+        if (date_from) {
+            where.push("Date(s.created_at) >= :date_from");
+            replacements.date_from = date_from;
+        }
+
+        if (date_to) {
+            where.push("Date(s.created_at) <= :date_to");
+            replacements.date_to = date_to;
+        }
+
+        if (payment_status) {
+            where.push("s.payment_status = :payment_status");
+            replacements.payment_status = String(payment_status).toLowerCase();
+        }
+
+        const whereSql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+        const sql = `
+            SELECT 
+                c.id as category_id,
+                c.name as category_name,
+                COALESCE(SUM(si.sub_total), 0) as total_sales
+            FROM tb_sale_item si
+            INNER JOIN tb_sales s on s.id = si.id_sales
+            INNER JOIN tb_product p on p.id = si.id_product
+            INNER JOIN tb_categories c on c.id = p.id_category
+            ${whereSql}
+            GROUP BY c.id, c.name
+            ORDER BY total_sales DESC
+        `;
+        const [rows] = await Sales.sequelize.query(sql, { replacements });
+        return res.status(200).json(rows);
+
+    } catch (e) {
+        return res.status(500).json({
+            error: e.message
+        });
+    }
+
+});
+
+// Total Sales per Product
+salesRoute.get('/api/sales/product-sales', auth, async (req, res) => {
+    try {
+        const { date_from, date_to, payment_status, limit } = req.query
+        const allowedPaymentStatus = ["paid", "pending"];
+
+        if (payment_status && !allowedPaymentStatus.includes(String(payment_status).toLowerCase())) {
+            return res.status(400).json({
+                msg: `Invalid payment_status. Allowed values : ${allowedPaymentStatus}`
+            });
+        }
+
+        const where = [];
+        const replacements = {};
+        const limitValue = Number(limit) > 0 ? Number(limit) : 20;
+
+        if (date_from) {
+            where.push("Date(s.created_at) >= :date_from");
+            replacements.date_from = date_from;
+        }
+        if (date_to) {
+            where.push("Date(s.created_at) <= :date_to");
+            replacements.date_to = date_to;
+        }
+
+        if (payment_status) {
+            where.push("s.payment_status = :payment_status");
+            replacements.payment_status = String(payment_status).toLowerCase();
+        }
+
+        const whereSql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+        const sql = `
+            SELECT
+                p.id as product_id,
+                p.product_name,
+                COALESCE(SUM(si.sub_total), 0) as total_sales
+            FROM tb_sale_item si
+            INNER JOIN tb_sales s ON s.id = si.id_sales
+            INNER JOIN tb_product p ON p.id = si.id_product
+            ${whereSql}
+            GROUP BY p.id, p.product_name
+            ORDER BY total_sales DESC
+            LIMIT ${limitValue}
+        `;
+
+        const [rows] = await Sales.sequelize.query(sql, { replacements });
+        return res.status(200).json(rows);
+
+    } catch (e) {
+        return res.status(500).json({ error: e.message });
+    }
+})
 
 // Get sales detail by id
 salesRoute.get('/api/sales/:id', auth, async (req, res) => {
