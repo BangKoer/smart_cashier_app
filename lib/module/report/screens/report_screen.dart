@@ -23,6 +23,7 @@ class _ReportScreenState extends State<ReportScreen> {
   DateTime? _fromDate;
   DateTime? _toDate;
   String _paymentStatus = 'all';
+  String _productSortBy = 'sales_desc';
 
   Map<String, dynamic> _kpi = {
     "total_transaction": 0,
@@ -46,7 +47,7 @@ class _ReportScreenState extends State<ReportScreen> {
   DateTime? _productFromDate;
   DateTime? _productToDate;
   String _productPaymentStatus = 'all';
-  int _productLimit = 50;
+  // int _productLimit = 50;
   int _productRowsPerPage = 10;
   List<Map<String, dynamic>> _productSales = [];
 
@@ -152,7 +153,8 @@ class _ReportScreenState extends State<ReportScreen> {
     final DateTime? localToDate = _toDate;
     final fromDateText =
         localFromDate == null ? 'From Date' : _formatDate(localFromDate);
-    final toDateText = localToDate == null ? 'To Date' : _formatDate(localToDate);
+    final toDateText =
+        localToDate == null ? 'To Date' : _formatDate(localToDate);
 
     return Card(
       elevation: 2,
@@ -169,7 +171,8 @@ class _ReportScreenState extends State<ReportScreen> {
               icon: const Icon(Icons.date_range),
               label: Text(fromDateText),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
               ),
             ),
             OutlinedButton.icon(
@@ -177,7 +180,8 @@ class _ReportScreenState extends State<ReportScreen> {
               icon: const Icon(Icons.event),
               label: Text(toDateText),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
               ),
             ),
             SizedBox(
@@ -312,11 +316,12 @@ class _ReportScreenState extends State<ReportScreen> {
     try {
       final data = await _reportServices.fetchProductSales(
         context: context,
-        dateFrom: _productFromDate,
-        dateTo: _productToDate,
+        // dateFrom: _productFromDate,
+        // dateTo: _productToDate,
         paymentStatus:
             _productPaymentStatus == 'all' ? null : _productPaymentStatus,
-        limit: _productLimit,
+        // limit: _productLimit,
+        sortBy: _productSortBy,
       );
       if (!mounted) return;
       setState(() {
@@ -460,9 +465,8 @@ class _ReportScreenState extends State<ReportScreen> {
 
   Widget _buildSalesSeriesSection() {
     final pointsRaw = (_series["points"] as List?) ?? const [];
-    final points = pointsRaw
-        .whereType<Map<String, dynamic>>()
-        .toList(growable: false);
+    final points =
+        pointsRaw.whereType<Map<String, dynamic>>().toList(growable: false);
 
     return Card(
       elevation: 3,
@@ -513,30 +517,32 @@ class _ReportScreenState extends State<ReportScreen> {
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 980;
         if (isWide) {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: _buildCategorySalesCard()),
-              const SizedBox(width: 16),
-              Expanded(child: _buildProductSalesCard()),
-            ],
+          return SizedBox(
+            height: 560,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _buildCategorySalesCard(isTight: true)),
+                const SizedBox(width: 16),
+                Expanded(child: _buildProductSalesCard(isTight: true)),
+              ],
+            ),
           );
         }
         return Column(
           children: [
-            _buildCategorySalesCard(),
+            _buildCategorySalesCard(isTight: false),
             const SizedBox(height: 16),
-            _buildProductSalesCard(),
+            _buildProductSalesCard(isTight: false),
           ],
         );
       },
     );
   }
 
-  Widget _buildCategorySalesCard() {
-    final fromText = _categoryFromDate == null
-        ? 'From'
-        : _formatDate(_categoryFromDate!);
+  Widget _buildCategorySalesCard({required bool isTight}) {
+    final fromText =
+        _categoryFromDate == null ? 'From' : _formatDate(_categoryFromDate!);
     final toText =
         _categoryToDate == null ? 'To' : _formatDate(_categoryToDate!);
 
@@ -547,6 +553,7 @@ class _ReportScreenState extends State<ReportScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.max,
           children: [
             const Text(
               "Sales per Category",
@@ -558,8 +565,10 @@ class _ReportScreenState extends State<ReportScreen> {
               runSpacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                OutlinedButton(onPressed: _pickCategoryFromDate, child: Text(fromText)),
-                OutlinedButton(onPressed: _pickCategoryToDate, child: Text(toText)),
+                OutlinedButton(
+                    onPressed: _pickCategoryFromDate, child: Text(fromText)),
+                OutlinedButton(
+                    onPressed: _pickCategoryToDate, child: Text(toText)),
                 SizedBox(
                   width: 160,
                   child: DropdownButtonFormField<String>(
@@ -572,7 +581,8 @@ class _ReportScreenState extends State<ReportScreen> {
                     items: const [
                       DropdownMenuItem(value: 'all', child: Text('All')),
                       DropdownMenuItem(value: 'paid', child: Text('Paid')),
-                      DropdownMenuItem(value: 'pending', child: Text('Pending')),
+                      DropdownMenuItem(
+                          value: 'pending', child: Text('Pending')),
                     ],
                     onChanged: (val) {
                       setState(() {
@@ -592,22 +602,12 @@ class _ReportScreenState extends State<ReportScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            if (_isCategoryLoading)
-              const SizedBox(height: 200, child: Center(child: CustomLoading()))
-            else if (_categoryError != null)
-              Text(_categoryError!, style: const TextStyle(color: Colors.red))
-            else if (_categorySales.isEmpty)
-              const SizedBox(
-                height: 200,
-                child: Center(child: Text("No category data")),
-              )
+            if (isTight)
+              Expanded(child: _buildCategoryChartBody())
             else
               SizedBox(
-                height: 220,
-                child: CustomPaint(
-                  painter: _CategoryBarChartPainter(data: _categorySales),
-                  child: Container(),
-                ),
+                height: 240,
+                child: _buildCategoryChartBody(),
               ),
           ],
         ),
@@ -615,11 +615,10 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
-  Widget _buildProductSalesCard() {
-    final fromText =
-        _productFromDate == null ? 'From' : _formatDate(_productFromDate!);
-    final toText =
-        _productToDate == null ? 'To' : _formatDate(_productToDate!);
+  Widget _buildProductSalesCard({required bool isTight}) {
+    // final fromText =
+    //     _productFromDate == null ? 'From' : _formatDate(_productFromDate!);
+    // final toText = _productToDate == null ? 'To' : _formatDate(_productToDate!);
 
     // final dataSource = _ProductSalesDataSource(_productSales);
 
@@ -630,6 +629,7 @@ class _ReportScreenState extends State<ReportScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.max,
           children: [
             const Text(
               "Product Sales",
@@ -641,8 +641,30 @@ class _ReportScreenState extends State<ReportScreen> {
               runSpacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                OutlinedButton(onPressed: _pickProductFromDate, child: Text(fromText)),
-                OutlinedButton(onPressed: _pickProductToDate, child: Text(toText)),
+                // OutlinedButton(onPressed: _pickProductFromDate, child: Text(fromText)),
+                // OutlinedButton(onPressed: _pickProductToDate, child: Text(toText)),
+                SizedBox(
+                  width: 200,
+                  child: DropdownButtonFormField(
+                    value: _productSortBy,
+                    decoration: const InputDecoration(
+                      labelText: "Sort By",
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'name_asc',child: Text("Name A-Z")),
+                      DropdownMenuItem(value: 'name_desc',child: Text("Name Z-A")),
+                      DropdownMenuItem(value: 'sales_desc',child: Text("Sales High-Low")),
+                      DropdownMenuItem(value: 'sales_asc',child: Text("Sales Low-High")),
+                    ],
+                    onChanged: (value) {
+                      setState(() {
+                        _productSortBy = value ?? 'sales_desc';
+                      });
+                    },
+                  ),
+                ),
                 SizedBox(
                   width: 160,
                   child: DropdownButtonFormField<String>(
@@ -655,7 +677,8 @@ class _ReportScreenState extends State<ReportScreen> {
                     items: const [
                       DropdownMenuItem(value: 'all', child: Text('All')),
                       DropdownMenuItem(value: 'paid', child: Text('Paid')),
-                      DropdownMenuItem(value: 'pending', child: Text('Pending')),
+                      DropdownMenuItem(
+                          value: 'pending', child: Text('Pending')),
                     ],
                     onChanged: (val) {
                       setState(() {
@@ -664,28 +687,28 @@ class _ReportScreenState extends State<ReportScreen> {
                     },
                   ),
                 ),
-                SizedBox(
-                  width: 120,
-                  child: DropdownButtonFormField<int>(
-                    value: _productLimit,
-                    decoration: const InputDecoration(
-                      labelText: "Limit",
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 10, child: Text('10')),
-                      DropdownMenuItem(value: 20, child: Text('20')),
-                      DropdownMenuItem(value: 50, child: Text('50')),
-                      DropdownMenuItem(value: 100, child: Text('100')),
-                    ],
-                    onChanged: (val) {
-                      setState(() {
-                        _productLimit = val ?? 20;
-                      });
-                    },
-                  ),
-                ),
+                // SizedBox(
+                //   width: 120,
+                //   child: DropdownButtonFormField<int>(
+                //     value: _productLimit,
+                //     decoration: const InputDecoration(
+                //       labelText: "Limit",
+                //       border: OutlineInputBorder(),
+                //       isDense: true,
+                //     ),
+                //     items: const [
+                //       DropdownMenuItem(value: 10, child: Text('10')),
+                //       DropdownMenuItem(value: 20, child: Text('20')),
+                //       DropdownMenuItem(value: 50, child: Text('50')),
+                //       DropdownMenuItem(value: 100, child: Text('100')),
+                //     ],
+                //     onChanged: (val) {
+                //       setState(() {
+                //         _productLimit = val ?? 20;
+                //       });
+                //     },
+                //   ),
+                // ),
                 ElevatedButton(
                   onPressed: _applyProductFilters,
                   child: const Text("Apply"),
@@ -697,62 +720,116 @@ class _ReportScreenState extends State<ReportScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            if (_isProductLoading)
-              const SizedBox(height: 200, child: Center(child: CustomLoading()))
-            else if (_productError != null)
-              Text(_productError!, style: const TextStyle(color: Colors.red))
-            else if (_productSales.isEmpty)
-              const SizedBox(
-                height: 200,
-                child: Center(child: Text("No product data")),
-              )
+            if (isTight)
+              Expanded(child: _buildProductTableBody())
             else
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final nameColWidth =
-                      (constraints.maxWidth * 0.65).clamp(200, 600).toDouble();
-                  final salesColWidth =
-                      (constraints.maxWidth * 0.25).clamp(120, 220).toDouble();
-                  return PaginatedDataTable(
-                    showFirstLastButtons: true,
-                    showCheckboxColumn: false,
-                    columnSpacing: 16,
-                    horizontalMargin: 12,
-                    headingRowHeight: 42,
-                    dataRowHeight: 44,
-                    columns: [
-                      DataColumn(
-                        label: SizedBox(
-                          width: nameColWidth,
-                          child: const Text("Product Name"),
-                        ),
-                      ),
-                      DataColumn(
-                        numeric: true,
-                        label: SizedBox(
-                          width: salesColWidth,
-                          child: const Text("Total Sales"),
-                        ),
-                      ),
-                    ],
-                    source: _ProductSalesDataSource(
-                      _productSales,
-                      nameColWidth: nameColWidth,
-                      salesColWidth: salesColWidth,
-                    ),
-                    rowsPerPage: _productRowsPerPage,
-                    onRowsPerPageChanged: (value) {
-                      if (value == null) return;
-                      setState(() {
-                        _productRowsPerPage = value;
-                      });
-                    },
-                  );
-                },
+              SizedBox(
+                height: 320,
+                child: _buildProductTableBody(),
               ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCategoryChartBody() {
+    if (_isCategoryLoading) {
+      return const Center(child: CustomLoading());
+    }
+    if (_categoryError != null) {
+      return Center(
+        child: Text(_categoryError!, style: const TextStyle(color: Colors.red)),
+      );
+    }
+    if (_categorySales.isEmpty) {
+      return const Center(child: Text("No category data"));
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return CustomPaint(
+          size: Size(constraints.maxWidth, constraints.maxHeight),
+          painter: _CategoryBarChartPainter(data: _categorySales),
+        );
+      },
+    );
+  }
+
+  Widget _buildProductTableBody() {
+    if (_isProductLoading) {
+      return const Center(child: CustomLoading());
+    }
+    if (_productError != null) {
+      return Center(
+        child: Text(_productError!, style: const TextStyle(color: Colors.red)),
+      );
+    }
+    if (_productSales.isEmpty) {
+      return const Center(child: Text("No product data"));
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final nameColWidth =
+            (constraints.maxWidth * 0.65).clamp(200, 600).toDouble();
+        final salesColWidth =
+            (constraints.maxWidth * 0.25).clamp(120, 220).toDouble();
+
+        // Ensure the table fits within the available height to avoid overflow.
+        const headingHeight = 40.0;
+        const dataRowHeight = 40.0;
+        const footerHeight = 56.0;
+        final availableHeight =
+            (constraints.maxHeight - headingHeight - footerHeight)
+                .clamp(0, double.infinity);
+        final maxRows =
+            availableHeight > 0 ? (availableHeight / dataRowHeight).floor() : 1;
+        final effectiveRowsPerPage =
+            _productRowsPerPage.clamp(1, maxRows == 0 ? 1 : maxRows);
+        final availableRows = <int>{
+          5,
+          10,
+          20,
+          effectiveRowsPerPage,
+        }.toList()
+          ..sort();
+
+        return PaginatedDataTable(
+          showFirstLastButtons: true,
+          showCheckboxColumn: false,
+          columnSpacing: 16,
+          horizontalMargin: 12,
+          headingRowHeight: headingHeight,
+          dataRowHeight: dataRowHeight,
+          columns: [
+            DataColumn(
+              label: SizedBox(
+                width: nameColWidth,
+                child: const Text("Product Name"),
+              ),
+            ),
+            DataColumn(
+              numeric: true,
+              label: SizedBox(
+                width: salesColWidth,
+                child: const Text("Total Sales"),
+              ),
+            ),
+          ],
+          source: _ProductSalesDataSource(
+            _productSales,
+            nameColWidth: nameColWidth,
+            salesColWidth: salesColWidth,
+          ),
+          rowsPerPage: effectiveRowsPerPage,
+          availableRowsPerPage: availableRows,
+          onRowsPerPageChanged: (value) {
+            if (value == null) return;
+            setState(() {
+              _productRowsPerPage = value;
+            });
+          },
+        );
+      },
     );
   }
 
@@ -805,33 +882,33 @@ class _ReportScreenState extends State<ReportScreen> {
     await _loadCategorySales();
   }
 
-  Future<void> _pickProductFromDate() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _productFromDate ?? now,
-      firstDate: DateTime(2020, 1, 1),
-      lastDate: DateTime(now.year + 5, 12, 31),
-    );
-    if (picked == null) return;
-    setState(() {
-      _productFromDate = picked;
-    });
-  }
+  // Future<void> _pickProductFromDate() async {
+  //   final now = DateTime.now();
+  //   final picked = await showDatePicker(
+  //     context: context,
+  //     initialDate: _productFromDate ?? now,
+  //     firstDate: DateTime(2020, 1, 1),
+  //     lastDate: DateTime(now.year + 5, 12, 31),
+  //   );
+  //   if (picked == null) return;
+  //   setState(() {
+  //     _productFromDate = picked;
+  //   });
+  // }
 
-  Future<void> _pickProductToDate() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _productToDate ?? _productFromDate ?? now,
-      firstDate: DateTime(2020, 1, 1),
-      lastDate: DateTime(now.year + 5, 12, 31),
-    );
-    if (picked == null) return;
-    setState(() {
-      _productToDate = picked;
-    });
-  }
+  // Future<void> _pickProductToDate() async {
+  //   final now = DateTime.now();
+  //   final picked = await showDatePicker(
+  //     context: context,
+  //     initialDate: _productToDate ?? _productFromDate ?? now,
+  //     firstDate: DateTime(2020, 1, 1),
+  //     lastDate: DateTime(now.year + 5, 12, 31),
+  //   );
+  //   if (picked == null) return;
+  //   setState(() {
+  //     _productToDate = picked;
+  //   });
+  // }
 
   Future<void> _applyProductFilters() async {
     final from = _productFromDate;
@@ -850,7 +927,8 @@ class _ReportScreenState extends State<ReportScreen> {
       _productFromDate = null;
       _productToDate = null;
       _productPaymentStatus = 'all';
-      _productLimit = 50;
+      // _productLimit = 50;
+      _productSortBy = 'sales_desc';
     });
     await _loadProductSales();
   }
@@ -917,7 +995,8 @@ class _SalesLineChartPainter extends CustomPainter {
 
     // Grid
     const yGridCount = 5;
-    final xGridCount = points.length <= 1 ? 1 : (points.length - 1).clamp(1, 20);
+    final xGridCount =
+        points.length <= 1 ? 1 : (points.length - 1).clamp(1, 20);
     for (int i = 0; i <= xGridCount; i++) {
       final x = chartLeft + (i / xGridCount) * chartWidth;
       canvas.drawLine(Offset(x, chartTop), Offset(x, chartBottom), gridPaint);
@@ -937,8 +1016,10 @@ class _SalesLineChartPainter extends CustomPainter {
       );
     }
 
-    canvas.drawLine(Offset(chartLeft, chartBottom), Offset(chartRight, chartBottom), axisPaint);
-    canvas.drawLine(Offset(chartLeft, chartTop), Offset(chartLeft, chartBottom), axisPaint);
+    canvas.drawLine(Offset(chartLeft, chartBottom),
+        Offset(chartRight, chartBottom), axisPaint);
+    canvas.drawLine(
+        Offset(chartLeft, chartTop), Offset(chartLeft, chartBottom), axisPaint);
 
     final path = Path();
     for (int i = 0; i < points.length; i++) {
@@ -947,8 +1028,8 @@ class _SalesLineChartPainter extends CustomPainter {
               ? chartWidth / 2
               : (i / (points.length - 1)) * chartWidth);
       final value = (points[i]["total_sales"] as num?)?.toDouble() ?? 0.0;
-      final y =
-          chartBottom - ((value - minValue) / (maxValue - minValue)) * chartHeight;
+      final y = chartBottom -
+          ((value - minValue) / (maxValue - minValue)) * chartHeight;
 
       if (i == 0) {
         path.moveTo(x, y);
@@ -964,13 +1045,14 @@ class _SalesLineChartPainter extends CustomPainter {
               ? chartWidth / 2
               : (i / (points.length - 1)) * chartWidth);
       final value = (points[i]["total_sales"] as num?)?.toDouble() ?? 0.0;
-      final y =
-          chartBottom - ((value - minValue) / (maxValue - minValue)) * chartHeight;
+      final y = chartBottom -
+          ((value - minValue) / (maxValue - minValue)) * chartHeight;
       canvas.drawCircle(Offset(x, y), 2.2, dotPaint);
     }
 
     final maxLabels = 8;
-    final step = points.length <= maxLabels ? 1 : (points.length / maxLabels).ceil();
+    final step =
+        points.length <= maxLabels ? 1 : (points.length / maxLabels).ceil();
     for (int i = 0; i < points.length; i += step) {
       final x = chartLeft +
           (points.length == 1
@@ -1004,7 +1086,8 @@ class _SalesLineChartPainter extends CustomPainter {
   }
 
   String _formatCompact(double value) {
-    if (value >= 1000000000) return '${(value / 1000000000).toStringAsFixed(1)}B';
+    if (value >= 1000000000)
+      return '${(value / 1000000000).toStringAsFixed(1)}B';
     if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(1)}M';
     if (value >= 1000) return '${(value / 1000).toStringAsFixed(0)}k';
     return value.toStringAsFixed(0);

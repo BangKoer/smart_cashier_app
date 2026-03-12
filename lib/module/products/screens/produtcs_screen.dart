@@ -662,7 +662,7 @@ class _ProdutcsScreenState extends State<ProdutcsScreen> {
           borderRadius: BorderRadius.circular(5),
         ),
         fixedSize: Size(
-            isWideScreen ? screenSizeWidth * 0.2 : screenSizeWidth * 0.5, 40),
+            isWideScreen ? screenSizeWidth * 0.2 : screenSizeWidth * 0.4, 40),
         backgroundColor: color,
       ),
       child: Row(

@@ -609,18 +609,24 @@ salesRoute.get('/api/sales/category-sales', auth, async (req, res) => {
 // Total Sales per Product
 salesRoute.get('/api/sales/product-sales', auth, async (req, res) => {
     try {
-        const { date_from, date_to, payment_status, limit } = req.query
+        const { date_from, date_to, payment_status, sort_by } = req.query
         const allowedPaymentStatus = ["paid", "pending"];
+        const allowedSortBy = ["name_asc", "name_desc", "sales_asc", "sales_desc",];
 
         if (payment_status && !allowedPaymentStatus.includes(String(payment_status).toLowerCase())) {
             return res.status(400).json({
-                msg: `Invalid payment_status. Allowed values : ${allowedPaymentStatus}`
+                msg: `Invalid payment_status. Allowed values : ${allowedPaymentStatus.join(", ")}`
+            });
+        }
+
+        if (sort_by && !allowedSortBy.includes(String(sort_by).toLowerCase())) {
+            return res.status(400).json({
+                msg: `Invalid sort_by. Allowed values: ${allowedSortBy.join(", ")}`
             });
         }
 
         const where = [];
         const replacements = {};
-        const limitValue = Number(limit) > 0 ? Number(limit) : 20;
 
         if (date_from) {
             where.push("Date(s.created_at) >= :date_from");
@@ -636,6 +642,13 @@ salesRoute.get('/api/sales/product-sales', auth, async (req, res) => {
             replacements.payment_status = String(payment_status).toLowerCase();
         }
 
+        let orderBy = "total_sales DESC";
+        const sortByNormalized = String(sort_by || "").toLowerCase();
+        if(sortByNormalized === "name_asc") orderBy = "p.product_name ASC";
+        if(sortByNormalized === "name_desc") orderBy = "p.product_name DESC";
+        if(sortByNormalized === "sales_asc") orderBy = "total_sales ASC";
+        if(sortByNormalized === "sales_desc") orderBy = "total_sales DESC";
+
         const whereSql = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
         const sql = `
             SELECT
@@ -647,8 +660,7 @@ salesRoute.get('/api/sales/product-sales', auth, async (req, res) => {
             INNER JOIN tb_product p ON p.id = si.id_product
             ${whereSql}
             GROUP BY p.id, p.product_name
-            ORDER BY total_sales DESC
-            LIMIT ${limitValue}
+            ORDER BY ${orderBy}
         `;
 
         const [rows] = await Sales.sequelize.query(sql, { replacements });

@@ -224,21 +224,23 @@ class ReportServices {
     DateTime? dateFrom,
     DateTime? dateTo,
     String? paymentStatus,
-    int limit = 20,
+    String? sortBy,
   }) async {
     final userProvider = Provider.of<UserProvider>(context, listen: false).user;
     final queryParameters = <String, String>{};
 
-    if (dateFrom != null) {
-      queryParameters['date_from'] = _formatDate(dateFrom);
-    }
-    if (dateTo != null) {
-      queryParameters['date_to'] = _formatDate(dateTo);
+    // if (dateFrom != null) {
+    //   queryParameters['date_from'] = _formatDate(dateFrom);
+    // }
+    // if (dateTo != null) {
+    //   queryParameters['date_to'] = _formatDate(dateTo);
+    // }
+    if (sortBy != null && sortBy.isNotEmpty) {
+      queryParameters['sort_by'] = sortBy.toLowerCase();
     }
     if (paymentStatus != null && paymentStatus.isNotEmpty) {
       queryParameters['payment_status'] = paymentStatus.toLowerCase();
     }
-    queryParameters['limit'] = limit.toString();
 
     final uri = Uri.parse('$baseUrl/api/sales/product-sales').replace(
       queryParameters: queryParameters.isEmpty ? null : queryParameters,
