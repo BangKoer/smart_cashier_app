@@ -6,6 +6,10 @@ import ProductUnit from "./ProductUnit.js";
 import User from "./User.js";
 import Sales from "./sales.js";
 import SaleItem from "./SaleItem.js";
+import PurchasedReceipt from "./PurchasedReceipt.js";
+import PurchasedReceiptItem from "./PurchasedReceiptItem.js";
+import PurchasedReceiptFile from "./PurchasedReceiptFile.js";
+import Supplier from "./supplier.js";
 
 // Category - Product
 Category.hasMany(Product, { foreignKey: "id_category", as: "products" });
@@ -33,6 +37,35 @@ SaleItem.belongsTo(Product, { foreignKey: "id_product", as: "product" });
 // SaleItem - ProductUnit
 SaleItem.belongsTo(ProductUnit, { foreignKey: "id_product_unit", as: "unit" });
 
+// PurchasedReceipt - Supplier
+PurchasedReceipt.belongsTo(Supplier, { foreignKey: "id_supplier" });
+Supplier.hasMany(PurchasedReceipt, { foreignKey: "id_supplier", as: "receipts" });
+
+// PurchasedReceipt - Items
+PurchasedReceipt.hasMany(PurchasedReceiptItem, {
+  foreignKey: "id_purchase_receipt",
+  as: "items",
+});
+PurchasedReceiptItem.belongsTo(PurchasedReceipt, {
+  foreignKey: "id_purchase_receipt",
+  as: "receipt",
+});
+
+// PurchasedReceipt - Files
+PurchasedReceipt.hasMany(PurchasedReceiptFile, {
+  foreignKey: "id_purchase_receipt",
+  as: "files",
+});
+PurchasedReceiptFile.belongsTo(PurchasedReceipt, {
+  foreignKey: "id_purchase_receipt",
+  as: "receipt",
+});
+
+// PurchasedReceiptItem - Product
+PurchasedReceiptItem.belongsTo(Product, { foreignKey: "id_product", as: "product" });
+
+
+
 export {
   Category,
   Product,
@@ -41,4 +74,7 @@ export {
   User,
   Sales,
   SaleItem,
+  PurchasedReceipt,
+  PurchasedReceiptItem,
+  PurchasedReceiptFile,
 };

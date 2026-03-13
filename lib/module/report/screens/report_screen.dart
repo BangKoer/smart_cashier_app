@@ -171,6 +171,8 @@ class _ReportScreenState extends State<ReportScreen> {
               icon: const Icon(Icons.date_range),
               label: Text(fromDateText),
               style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(5)),
                 padding:
                     const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
               ),
@@ -180,6 +182,8 @@ class _ReportScreenState extends State<ReportScreen> {
               icon: const Icon(Icons.event),
               label: Text(toDateText),
               style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(5)),
                 padding:
                     const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
               ),
@@ -531,9 +535,15 @@ class _ReportScreenState extends State<ReportScreen> {
         }
         return Column(
           children: [
-            _buildCategorySalesCard(isTight: false),
+            SizedBox(
+              height: 520,
+              child: _buildCategorySalesCard(isTight: true),
+            ),
             const SizedBox(height: 16),
-            _buildProductSalesCard(isTight: false),
+            SizedBox(
+              height: 520,
+              child: _buildProductSalesCard(isTight: true),
+            ),
           ],
         );
       },
@@ -565,10 +575,22 @@ class _ReportScreenState extends State<ReportScreen> {
               runSpacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                OutlinedButton(
-                    onPressed: _pickCategoryFromDate, child: Text(fromText)),
-                OutlinedButton(
-                    onPressed: _pickCategoryToDate, child: Text(toText)),
+                OutlinedButton.icon(
+                    icon: const Icon(Icons.date_range),
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(5)),
+                    ),
+                    onPressed: _pickCategoryFromDate,
+                    label: Text(fromText)),
+                OutlinedButton.icon(
+                    icon: const Icon(Icons.event),
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(5)),
+                    ),
+                    onPressed: _pickCategoryToDate,
+                    label: Text(toText)),
                 SizedBox(
                   width: 160,
                   child: DropdownButtonFormField<String>(
@@ -653,10 +675,14 @@ class _ReportScreenState extends State<ReportScreen> {
                       isDense: true,
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'name_asc',child: Text("Name A-Z")),
-                      DropdownMenuItem(value: 'name_desc',child: Text("Name Z-A")),
-                      DropdownMenuItem(value: 'sales_desc',child: Text("Sales High-Low")),
-                      DropdownMenuItem(value: 'sales_asc',child: Text("Sales Low-High")),
+                      DropdownMenuItem(
+                          value: 'name_asc', child: Text("Name A-Z")),
+                      DropdownMenuItem(
+                          value: 'name_desc', child: Text("Name Z-A")),
+                      DropdownMenuItem(
+                          value: 'sales_desc', child: Text("Sales High-Low")),
+                      DropdownMenuItem(
+                          value: 'sales_asc', child: Text("Sales Low-High")),
                     ],
                     onChanged: (value) {
                       setState(() {
