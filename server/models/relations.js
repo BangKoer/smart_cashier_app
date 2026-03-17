@@ -43,21 +43,21 @@ Supplier.hasMany(PurchasedReceipt, { foreignKey: "id_supplier", as: "receipts" }
 
 // PurchasedReceipt - Items
 PurchasedReceipt.hasMany(PurchasedReceiptItem, {
-  foreignKey: "id_purchase_receipt",
+  foreignKey: "id_purchased_receipt",
   as: "items",
 });
 PurchasedReceiptItem.belongsTo(PurchasedReceipt, {
-  foreignKey: "id_purchase_receipt",
+  foreignKey: "id_purchased_receipt",
   as: "receipt",
 });
 
 // PurchasedReceipt - Files
 PurchasedReceipt.hasMany(PurchasedReceiptFile, {
-  foreignKey: "id_purchase_receipt",
+  foreignKey: "id_purchased_receipt",
   as: "files",
 });
 PurchasedReceiptFile.belongsTo(PurchasedReceipt, {
-  foreignKey: "id_purchase_receipt",
+  foreignKey: "id_purchased_receipt",
   as: "receipt",
 });
 

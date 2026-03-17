@@ -20,6 +20,7 @@ const PurchasedReceipt = sequelize.define(
     receipt_date: {
         type: DataTypes.DATE,
         allowNull: false,
+        field:"date"
     },
     total_cost: {
         type: DataTypes.DECIMAL(10, 2),

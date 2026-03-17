@@ -11,6 +11,7 @@ const Supplier = sequelize.define(
     supplier_name: {
         type: DataTypes.STRING(255),
         allowNull: false,
+        field:"name"
     },
     company: {
         type: DataTypes.STRING(100),

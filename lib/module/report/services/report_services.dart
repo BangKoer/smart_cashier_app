@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -6,6 +7,8 @@ import 'package:provider/provider.dart';
 import 'package:smart_cashier_app/constant/error_handling.dart';
 import 'package:smart_cashier_app/constant/global_variables.dart';
 import 'package:smart_cashier_app/constant/utils.dart';
+import 'package:smart_cashier_app/models/purchased_receipt.dart';
+import 'package:smart_cashier_app/models/purchased_receipt_file.dart';
 import 'package:smart_cashier_app/providers/user_provider.dart';
 
 class ReportServices {
@@ -19,14 +22,27 @@ class ReportServices {
     return int.tryParse(v.toString()) ?? 0;
   }
 
+  String _formatDate(DateTime date) {
+    final year = date.year.toString().padLeft(4, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '$year-$month-$day';
+  }
+
+  Map<String, String> _authHeaders(BuildContext context) {
+    final user = Provider.of<UserProvider>(context, listen: false).user;
+    return {
+      'Content-Type': 'application/json; charset=UTF-8',
+      'x-auth-token': user.token,
+    };
+  }
+
   Future<Map<String, dynamic>> fetchKpiSummary({
     required BuildContext context,
     DateTime? dateFrom,
     DateTime? dateTo,
     String? paymentStatus, // paid | pending | null (all)
   }) async {
-    final userProvider = Provider.of<UserProvider>(context, listen: false).user;
-
     final queryParameters = <String, String>{};
     if (dateFrom != null) {
       queryParameters['date_from'] = _formatDate(dateFrom);
@@ -57,10 +73,7 @@ class ReportServices {
     try {
       final res = await http.get(
         uri,
-        headers: {
-          'Content-Type': 'application/json; charset=UTF-8',
-          'x-auth-token': userProvider.token,
-        },
+        headers: _authHeaders(context),
       );
 
       httpErrorhandle(
@@ -69,11 +82,9 @@ class ReportServices {
         onSuccess: () {
           final decoded = jsonDecode(res.body) as Map<String, dynamic>;
           result = {
-            "total_transaction":
-                _toInt(decoded["total_transaction"]),
+            "total_transaction": _toInt(decoded["total_transaction"]),
             "total_sales": _toDouble(decoded["total_sales"]),
-            "total_profit":
-                _toDouble(decoded["total_profit"]),
+            "total_profit": _toDouble(decoded["total_profit"]),
             "avg_transaction_value":
                 _toDouble(decoded["avg_transaction_value"]),
             "filters": decoded["filters"] ?? result["filters"],
@@ -95,8 +106,6 @@ class ReportServices {
     String? paymentStatus, // paid | pending | null (all)
     String? groupBy, // day | week | month | null (auto)
   }) async {
-    final userProvider = Provider.of<UserProvider>(context, listen: false).user;
-
     final queryParameters = <String, String>{};
     if (dateFrom != null) {
       queryParameters['date_from'] = _formatDate(dateFrom);
@@ -128,10 +137,7 @@ class ReportServices {
     try {
       final res = await http.get(
         uri,
-        headers: {
-          'Content-Type': 'application/json; charset=UTF-8',
-          'x-auth-token': userProvider.token,
-        },
+        headers: _authHeaders(context),
       );
 
       httpErrorhandle(
@@ -171,7 +177,6 @@ class ReportServices {
     DateTime? dateTo,
     String? paymentStatus,
   }) async {
-    final userProvider = Provider.of<UserProvider>(context, listen: false).user;
     final queryParameters = <String, String>{};
 
     if (dateFrom != null) {
@@ -191,10 +196,7 @@ class ReportServices {
     List<Map<String, dynamic>> result = [];
 
     try {
-      final res = await http.get(uri, headers: {
-        'Content-Type': 'application/json; charset=UTF-8',
-        'x-auth-token': userProvider.token,
-      });
+      final res = await http.get(uri, headers: _authHeaders(context));
 
       httpErrorhandle(
         response: res,
@@ -226,7 +228,6 @@ class ReportServices {
     String? paymentStatus,
     String? sortBy,
   }) async {
-    final userProvider = Provider.of<UserProvider>(context, listen: false).user;
     final queryParameters = <String, String>{};
 
     // if (dateFrom != null) {
@@ -251,10 +252,7 @@ class ReportServices {
     try {
       final res = await http.get(
         uri,
-        headers: {
-          'Content-Type': 'application/json; charset=UTF-8',
-          'x-auth-token': userProvider.token,
-        },
+        headers: _authHeaders(context),
       );
 
       httpErrorhandle(
@@ -267,7 +265,7 @@ class ReportServices {
               .map((item) => {
                     "product_id": item["product_id"],
                     "product_name": item["product_name"],
-                    "total_sales":_toDouble(item["total_sales"]),
+                    "total_sales": _toDouble(item["total_sales"]),
                   })
               .toList();
         },
@@ -280,10 +278,208 @@ class ReportServices {
     return result;
   }
 
-  String _formatDate(DateTime date) {
-    final year = date.year.toString().padLeft(4, '0');
-    final month = date.month.toString().padLeft(2, '0');
-    final day = date.day.toString().padLeft(2, '0');
-    return '$year-$month-$day';
+  Future<List<PurchasedReceipt>> fetchPurchasedReceipts({
+    required BuildContext context,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/purchased-receipts');
+    List<PurchasedReceipt> result = [];
+
+    try {
+      final res = await http.get(uri, headers: _authHeaders(context));
+
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          final decoded = jsonDecode(res.body) as List;
+          result = decoded
+              .whereType<Map<String, dynamic>>()
+              .map(PurchasedReceipt.fromMap)
+              .toList();
+        },
+      );
+    } catch (e) {
+      debugPrint(e.toString());
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
+    }
+
+    return result;
+  }
+
+  Future<PurchasedReceipt?> fetchPurchasedReceiptDetail({
+    required BuildContext context,
+    required int id,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/purchased-receipts/$id');
+    PurchasedReceipt? result;
+
+    try {
+      final res = await http.get(uri, headers: _authHeaders(context));
+      debugPrint(jsonDecode(res.body).toString());
+      debugPrint(res.statusCode.toString());
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+          result = PurchasedReceipt.fromMap(decoded);
+        },
+      );
+    } catch (e) {
+      debugPrint(e.toString());
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
+    }
+
+    return result;
+  }
+
+  Future<Map<String, dynamic>?> createPurchasedReceipt({
+    required BuildContext context,
+    required Map<String, dynamic> payload,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/purchased-receipts');
+    Map<String, dynamic>? result;
+
+    try {
+      final res = await http.post(
+        uri,
+        headers: _authHeaders(context),
+        body: jsonEncode(payload),
+      );
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          result = jsonDecode(res.body) as Map<String, dynamic>;
+        },
+      );
+    } catch (e) {
+      debugPrint(e.toString());
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
+    }
+
+    return result;
+  }
+
+  Future<bool> updatePurchasedReceipt({
+    required BuildContext context,
+    required int id,
+    required Map<String, dynamic> payload,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/purchased-receipts/$id');
+    bool ok = false;
+
+    try {
+      final res = await http.put(
+        uri,
+        headers: _authHeaders(context),
+        body: jsonEncode(payload),
+      );
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          ok = true;
+        },
+      );
+    } catch (e) {
+      debugPrint(e.toString());
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
+    }
+
+    return ok;
+  }
+
+  Future<bool> deletePurchasedReceipt({
+    required BuildContext context,
+    required int id,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/purchased-receipts/$id');
+    bool ok = false;
+
+    try {
+      final res = await http.delete(uri, headers: _authHeaders(context));
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          ok = true;
+        },
+      );
+    } catch (e) {
+      debugPrint(e.toString());
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
+    }
+
+    return ok;
+  }
+
+  Future<PurchasedReceiptFile?> uploadPurchasedReceiptFile({
+    required BuildContext context,
+    required int receiptId,
+    required String filePath,
+  }) async {
+    PurchasedReceiptFile? result;
+
+    try {
+      final uri = Uri.parse(
+        '$baseUrl/api/purchased-receipts/$receiptId/files',
+      );
+      final request = http.MultipartRequest('POST', uri);
+      final headers = _authHeaders(context);
+      request.headers['x-auth-token'] = headers['x-auth-token'] ?? '';
+
+      final file = File(filePath);
+      request.files.add(await http.MultipartFile.fromPath('file', file.path));
+
+      final streamed = await request.send();
+      final res = await http.Response.fromStream(streamed);
+      debugPrint("UPLOAD STATUS: ${res.statusCode}");
+      debugPrint("UPLOAD BODY: ${res.body}");
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+          if (decoded["file"] is Map<String, dynamic>) {
+            result = PurchasedReceiptFile.fromMap(
+              decoded["file"] as Map<String, dynamic>,
+            );
+          }
+        },
+      );
+    } catch (e) {
+      debugPrint(e.toString());
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
+    }
+
+    return result;
+  }
+
+  Future<bool> deletePurchasedReceiptFile({
+    required BuildContext context,
+    required int receiptId,
+    required int fileId,
+  }) async {
+    final uri = Uri.parse(
+      '$baseUrl/api/purchased-receipts/$receiptId/files/$fileId',
+    );
+    bool ok = false;
+
+    try {
+      final res = await http.delete(uri, headers: _authHeaders(context));
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          ok = true;
+        },
+      );
+    } catch (e) {
+      debugPrint(e.toString());
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
+    }
+
+    return ok;
   }
 }

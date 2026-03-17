@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
+import 'package:file_picker/file_picker.dart';
 import 'package:smart_cashier_app/common/widgets/custom_loading.dart';
 import 'package:smart_cashier_app/constant/global_variables.dart';
 import 'package:smart_cashier_app/constant/utils.dart';
+import 'package:smart_cashier_app/models/purchased_receipt.dart';
 import 'package:smart_cashier_app/module/report/services/report_services.dart';
 import 'package:smart_cashier_app/utils/format_rupiah.dart' as format;
 
@@ -51,6 +53,10 @@ class _ReportScreenState extends State<ReportScreen> {
   int _productRowsPerPage = 10;
   List<Map<String, dynamic>> _productSales = [];
 
+  bool _isReceiptLoading = true;
+  String? _receiptError;
+  List<PurchasedReceipt> _purchasedReceipts = [];
+
   Future<void> _loadKpiSummary() async {
     setState(() {
       _isLoading = true;
@@ -94,6 +100,7 @@ class _ReportScreenState extends State<ReportScreen> {
     _loadKpiSummary();
     _loadCategorySales();
     _loadProductSales();
+    _loadPurchasedReceipts();
   }
 
   @override
@@ -140,6 +147,8 @@ class _ReportScreenState extends State<ReportScreen> {
                   _buildSalesSeriesSection(),
                   const SizedBox(height: 20),
                   _buildCategoryAndProductRow(),
+                  const SizedBox(height: 20),
+                  _buildPurchasedReceiptsSection(),
                 ],
               ),
           ],
@@ -340,6 +349,32 @@ class _ReportScreenState extends State<ReportScreen> {
       if (!mounted) return;
       setState(() {
         _isProductLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadPurchasedReceipts() async {
+    setState(() {
+      _isReceiptLoading = true;
+      _receiptError = null;
+    });
+    try {
+      final data = await _reportServices.fetchPurchasedReceipts(
+        context: context,
+      );
+      if (!mounted) return;
+      setState(() {
+        _purchasedReceipts = data;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _receiptError = e.toString();
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isReceiptLoading = false;
       });
     }
   }
@@ -957,6 +992,441 @@ class _ReportScreenState extends State<ReportScreen> {
       _productSortBy = 'sales_desc';
     });
     await _loadProductSales();
+  }
+
+  Widget _buildPurchasedReceiptsSection() {
+    return Card(
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "Invoice / Receipt Supplier",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            _buildPurchasedReceiptsTable(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPurchasedReceiptsTable() {
+    if (_isReceiptLoading) {
+      return const SizedBox(
+        height: 160,
+        child: Center(child: CustomLoading()),
+      );
+    }
+    if (_receiptError != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child:
+            Text(_receiptError!, style: const TextStyle(color: Colors.red)),
+      );
+    }
+    return LayoutBuilder(
+      builder: (context, constraint) {
+        return Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.rectangle,
+            borderRadius: BorderRadius.circular(5),
+            border: Border.all(color: Colors.black),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.vertical,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: constraint.maxWidth),
+                child: DataTable(
+                  dataRowMinHeight: 48,
+                  columns: const [
+                    DataColumn(label: Text("No")),
+                    DataColumn(label: Text("Receipt No")),
+                    DataColumn(label: Text("Supplier")),
+                    DataColumn(label: Text("Date")),
+                    DataColumn(label: Text("Total Cost")),
+                    DataColumn(label: Text("Note")),
+                    DataColumn(label: Text("Action")),
+                  ],
+                  rows: List.generate(
+                    _purchasedReceipts.isEmpty
+                        ? 1
+                        : _purchasedReceipts.length,
+                    (index) {
+                      if (_purchasedReceipts.isEmpty) {
+                        return const DataRow(
+                          cells: [
+                            DataCell(Text('-')),
+                            DataCell(Text('-')),
+                            DataCell(Text('No receipts found')),
+                            DataCell(Text('-')),
+                            DataCell(Text('-')),
+                            DataCell(Text('-')),
+                            DataCell(Text('-')),
+                          ],
+                        );
+                      }
+
+                      final item = _purchasedReceipts[index];
+                      final supplierName =
+                          item.supplier?.name.isNotEmpty == true
+                              ? item.supplier!.name
+                              : "-";
+                      String dateText = item.receiptDate;
+                      try {
+                        dateText = DateFormat('dd-MMM-yyyy')
+                            .format(DateTime.parse(item.receiptDate));
+                      } catch (_) {}
+
+                      return DataRow(
+                        cells: [
+                          DataCell(Text('${index + 1}')),
+                          DataCell(Text(item.receiptNo.isNotEmpty
+                              ? item.receiptNo
+                              : "-")),
+                          DataCell(Text(supplierName)),
+                          DataCell(Text(dateText)),
+                          DataCell(
+                            Text(format.toRupiah(item.totalCost)),
+                          ),
+                          DataCell(Text(item.note?.toString() ?? "-")),
+                          DataCell(
+                            Row(
+                              children: [
+                                IconButton(
+                                  onPressed: () {
+                                    _showPurchasedReceiptDialog(item.id);
+                                  },
+                                  icon: const Icon(Icons.visibility),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                    foregroundColor: Colors.white,
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.all(Radius.circular(5)),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                IconButton(
+                                  onPressed: () {
+                                    _handleUploadInvoice(item.id);
+                                  },
+                                  icon: const Icon(Icons.upload_file),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    foregroundColor: Colors.white,
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.all(Radius.circular(5)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleUploadInvoice(int receiptId) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      allowMultiple: false,
+      withData: false,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final filePath = result.files.single.path;
+    if (filePath == null || filePath.isEmpty) {
+      if (!mounted) return;
+      showSnackBar(context, "Invalid file path", bgColor: Colors.red);
+      return;
+    }
+
+    if (!mounted) return;
+    showSnackBar(context, "Uploading invoice...", bgColor: Colors.black87);
+    final uploaded = await _reportServices.uploadPurchasedReceiptFile(
+      context: context,
+      receiptId: receiptId,
+      filePath: filePath,
+    );
+    if (!mounted) return;
+    if (uploaded == null) {
+      showSnackBar(context, "Upload failed", bgColor: Colors.red);
+      return;
+    }
+    showSnackBar(context, "Invoice uploaded", bgColor: Colors.green);
+    await _loadPurchasedReceipts();
+  }
+
+  Future<void> _showPurchasedReceiptDialog(int receiptId) async {
+    bool isLoading = true;
+    String? error;
+    PurchasedReceipt? detail;
+
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          Future<void> load() async {
+            try {
+              final data = await _reportServices.fetchPurchasedReceiptDetail(
+                context: context,
+                id: receiptId,
+              );
+              if (!mounted) return;
+              setDialogState(() {
+                detail = data;
+                isLoading = false;
+              });
+            } catch (e) {
+              if (!mounted) return;
+              setDialogState(() {
+                error = e.toString();
+                isLoading = false;
+              });
+            }
+          }
+
+          if (isLoading && detail == null && error == null) {
+            load();
+          }
+
+          return AlertDialog(
+            insetPadding: const EdgeInsets.all(20),
+            backgroundColor: GlobalVariables.backgroundColor,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: const Text(
+              "Invoice / Receipt Supplier",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            content: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.7,
+              height: MediaQuery.of(context).size.height * 0.7,
+              child: isLoading
+                  ? const Center(child: CustomLoading())
+                  : error != null
+                      ? Center(
+                          child: Text(
+                            error!,
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        )
+                      : detail == null
+                          ? const Center(child: Text("No detail found"))
+                          : _buildReceiptDetailBody(detail!),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Close"),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildReceiptDetailBody(PurchasedReceipt receipt) {
+    final supplierName =
+        receipt.supplier?.name.isNotEmpty == true ? receipt.supplier!.name : "-";
+    String dateText = receipt.receiptDate;
+    try {
+      dateText = DateFormat('dd-MMM-yyyy').format(
+        DateTime.parse(receipt.receiptDate),
+      );
+    } catch (_) {}
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 16,
+                runSpacing: 8,
+                children: [
+                  _detailChip("Receipt No", receipt.receiptNo),
+                  _detailChip("Supplier", supplierName),
+                  _detailChip("Date", dateText),
+                  _detailChip("Total", format.toRupiah(receipt.totalCost)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                "Note: ${receipt.note ?? "-"}",
+                style: const TextStyle(color: Colors.black54),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                "Items",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: receipt.items.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final item = receipt.items[index];
+                  return ListTile(
+                    dense: true,
+                    title: Text(
+                      item.productName?.isNotEmpty == true
+                          ? item.productName!
+                          : "Product ID: ${item.idProduct}",
+                    ),
+                    subtitle: Text("Qty: ${item.qty}  |  Unit: ${item.unitCost}"),
+                    trailing: Text(format.toRupiah(item.subTotal)),
+                  );
+                },
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                "Files",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              if (receipt.files.isEmpty)
+                const Text("No files uploaded")
+              else
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final itemWidth = (constraints.maxWidth * 0.45).clamp(160, 320).toDouble();
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: receipt.files.map((f) {
+                        final imageUrl = '$baseUrl${f.filePath}';
+                        return InkWell(
+                          onTap: () => _showInvoiceImageDialog(imageUrl, f.fileName),
+                          child: Container(
+                            width: itemWidth,
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.black12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(8),
+                                  ),
+                                  child: Image.network(
+                                    imageUrl,
+                                    height: 140,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stack) => Container(
+                                      height: 140,
+                                      color: Colors.grey.shade200,
+                                      alignment: Alignment.center,
+                                      child: const Text("Image not available"),
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.all(8),
+                                  child: Text(
+                                    f.fileName,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showInvoiceImageDialog(String imageUrl, String title) async {
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(20),
+        backgroundColor: Colors.black,
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4,
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stack) => const SizedBox(
+                  height: 240,
+                  child: Center(
+                    child: Text(
+                      "Image not available",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close, color: Colors.white),
+              ),
+            ),
+            Positioned(
+              left: 12,
+              top: 12,
+              child: Text(
+                title,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _detailChip(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        color: Colors.grey.shade200,
+      ),
+      child: Text(
+        "$label: $value",
+        style: const TextStyle(fontSize: 12),
+      ),
+    );
   }
 }
 
