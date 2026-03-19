@@ -10,6 +10,7 @@ import "./models/relations.js"
 import path from "path"
 import { fileURLToPath } from "url";
 import purchasedReceiptRouter from "./routes/PurchasedReceipt.js";
+import supplierRouter from "./routes/Supplier.js";
 
 const app = express();
 const PORT = 3000;
@@ -25,6 +26,7 @@ app.use(productRouter);
 app.use(authRouter);
 app.use(salesRouter);
 app.use(purchasedReceiptRouter)
+app.use(supplierRouter)
 
 // DB connection Test
 sequelize.authenticate()

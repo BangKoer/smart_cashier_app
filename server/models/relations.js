@@ -38,7 +38,7 @@ SaleItem.belongsTo(Product, { foreignKey: "id_product", as: "product" });
 SaleItem.belongsTo(ProductUnit, { foreignKey: "id_product_unit", as: "unit" });
 
 // PurchasedReceipt - Supplier
-PurchasedReceipt.belongsTo(Supplier, { foreignKey: "id_supplier" });
+PurchasedReceipt.belongsTo(Supplier, { foreignKey: "id_supplier", as: "supplier" });
 Supplier.hasMany(PurchasedReceipt, { foreignKey: "id_supplier", as: "receipts" });
 
 // PurchasedReceipt - Items

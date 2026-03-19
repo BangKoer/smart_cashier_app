@@ -9,6 +9,7 @@ import 'package:smart_cashier_app/constant/global_variables.dart';
 import 'package:smart_cashier_app/constant/utils.dart';
 import 'package:smart_cashier_app/models/purchased_receipt.dart';
 import 'package:smart_cashier_app/models/purchased_receipt_file.dart';
+import 'package:smart_cashier_app/models/supplier.dart';
 import 'package:smart_cashier_app/providers/user_provider.dart';
 
 class ReportServices {
@@ -315,8 +316,8 @@ class ReportServices {
 
     try {
       final res = await http.get(uri, headers: _authHeaders(context));
-      debugPrint(jsonDecode(res.body).toString());
-      debugPrint(res.statusCode.toString());
+      // debugPrint(jsonDecode(res.body).toString());
+      // debugPrint(res.statusCode.toString());
       httpErrorhandle(
         response: res,
         context: context,
@@ -434,8 +435,8 @@ class ReportServices {
 
       final streamed = await request.send();
       final res = await http.Response.fromStream(streamed);
-      debugPrint("UPLOAD STATUS: ${res.statusCode}");
-      debugPrint("UPLOAD BODY: ${res.body}");
+      // debugPrint("UPLOAD STATUS: ${res.statusCode}");
+      // debugPrint("UPLOAD BODY: ${res.body}");
       httpErrorhandle(
         response: res,
         context: context,
@@ -481,5 +482,72 @@ class ReportServices {
     }
 
     return ok;
+  }
+
+  Future<List<Supplier>> fetchSuppliers({
+    required BuildContext context,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/suppliers');
+    List<Supplier> result = [];
+
+    try {
+      final res = await http.get(uri, headers: _authHeaders(context));
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          final decoded = jsonDecode(res.body) as List;
+          result = decoded
+              .whereType<Map<String, dynamic>>()
+              .map(Supplier.fromMap)
+              .toList();
+        },
+      );
+    } catch (e) {
+      debugPrint(e.toString());
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
+    }
+
+    return result;
+  }
+
+  Future<Supplier?> createSupplier({
+    required BuildContext context,
+    required String supplierName,
+    String? company,
+    String? phone,
+    String? address,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/suppliers');
+    Supplier? result;
+
+    try {
+      final res = await http.post(
+        uri,
+        headers: _authHeaders(context),
+        body: jsonEncode({
+          "supplier_name": supplierName,
+          "company": company,
+          "phone": phone,
+          "address": address,
+        }),
+      );
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+          final data = decoded["data"];
+          if (data is Map<String, dynamic>) {
+            result = Supplier.fromMap(data);
+          }
+        },
+      );
+    } catch (e) {
+      debugPrint(e.toString());
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
+    }
+
+    return result;
   }
 }

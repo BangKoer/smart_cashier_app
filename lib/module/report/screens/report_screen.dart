@@ -6,7 +6,11 @@ import 'package:smart_cashier_app/common/widgets/custom_loading.dart';
 import 'package:smart_cashier_app/constant/global_variables.dart';
 import 'package:smart_cashier_app/constant/utils.dart';
 import 'package:smart_cashier_app/models/purchased_receipt.dart';
+import 'package:smart_cashier_app/models/product.dart';
+import 'package:smart_cashier_app/models/product_unit.dart';
+import 'package:smart_cashier_app/models/supplier.dart';
 import 'package:smart_cashier_app/module/report/services/report_services.dart';
+import 'package:smart_cashier_app/module/products/services/products_services.dart';
 import 'package:smart_cashier_app/utils/format_rupiah.dart' as format;
 
 class ReportScreen extends StatefulWidget {
@@ -19,6 +23,7 @@ class ReportScreen extends StatefulWidget {
 
 class _ReportScreenState extends State<ReportScreen> {
   final ReportServices _reportServices = ReportServices();
+  final ProductServices _productServices = ProductServices();
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -56,6 +61,14 @@ class _ReportScreenState extends State<ReportScreen> {
   bool _isReceiptLoading = true;
   String? _receiptError;
   List<PurchasedReceipt> _purchasedReceipts = [];
+
+  bool _isSupplierLoading = true;
+  String? _supplierError;
+  List<Supplier> _suppliers = [];
+
+  bool _isProductsLoading = true;
+  String? _productsError;
+  List<Product> _products = [];
 
   Future<void> _loadKpiSummary() async {
     setState(() {
@@ -101,6 +114,8 @@ class _ReportScreenState extends State<ReportScreen> {
     _loadCategorySales();
     _loadProductSales();
     _loadPurchasedReceipts();
+    _loadSuppliers();
+    _loadProducts();
   }
 
   @override
@@ -375,6 +390,54 @@ class _ReportScreenState extends State<ReportScreen> {
       if (!mounted) return;
       setState(() {
         _isReceiptLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadSuppliers() async {
+    setState(() {
+      _isSupplierLoading = true;
+      _supplierError = null;
+    });
+    try {
+      final data = await _reportServices.fetchSuppliers(context: context);
+      if (!mounted) return;
+      setState(() {
+        _suppliers = data;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _supplierError = e.toString();
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isSupplierLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadProducts() async {
+    setState(() {
+      _isProductsLoading = true;
+      _productsError = null;
+    });
+    try {
+      final data = await _productServices.fetchAllProducts(context: context);
+      if (!mounted) return;
+      setState(() {
+        _products = data;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _productsError = e.toString();
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isProductsLoading = false;
       });
     }
   }
@@ -1008,6 +1071,19 @@ class _ReportScreenState extends State<ReportScreen> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ElevatedButton.icon(
+                onPressed: _showAddInvoiceDialog,
+                icon: const Icon(Icons.add),
+                label: const Text("Add Invoice"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
             _buildPurchasedReceiptsTable(),
           ],
         ),
@@ -1025,8 +1101,7 @@ class _ReportScreenState extends State<ReportScreen> {
     if (_receiptError != null) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        child:
-            Text(_receiptError!, style: const TextStyle(color: Colors.red)),
+        child: Text(_receiptError!, style: const TextStyle(color: Colors.red)),
       );
     }
     return LayoutBuilder(
@@ -1055,9 +1130,7 @@ class _ReportScreenState extends State<ReportScreen> {
                     DataColumn(label: Text("Action")),
                   ],
                   rows: List.generate(
-                    _purchasedReceipts.isEmpty
-                        ? 1
-                        : _purchasedReceipts.length,
+                    _purchasedReceipts.isEmpty ? 1 : _purchasedReceipts.length,
                     (index) {
                       if (_purchasedReceipts.isEmpty) {
                         return const DataRow(
@@ -1128,6 +1201,36 @@ class _ReportScreenState extends State<ReportScreen> {
                                     ),
                                   ),
                                 ),
+                                const SizedBox(width: 6),
+                                IconButton(
+                                  onPressed: () {
+                                    _updateInvoice(item.id);
+                                  },
+                                  icon: const Icon(Icons.edit),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: Colors.yellow,
+                                    foregroundColor: Colors.white,
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.all(Radius.circular(5)),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                IconButton(
+                                  onPressed: () {
+                                    _deleteInvoice(item);
+                                  },
+                                  icon: const Icon(Icons.delete_forever),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    foregroundColor: Colors.white,
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius:
+                                          BorderRadius.all(Radius.circular(5)),
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -1141,6 +1244,253 @@ class _ReportScreenState extends State<ReportScreen> {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _updateInvoice(int receiptId) async {
+    PurchasedReceipt? detail;
+    bool isLoading = true;
+    bool isSubmitting = false;
+    String? error;
+
+    final receiptNoCtrl = TextEditingController();
+    final noteCtrl = TextEditingController();
+    DateTime? receiptDate;
+
+    final qtyCtrls = <TextEditingController>[];
+    final unitCtrls = <TextEditingController>[];
+
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          Future<void> loadDetail() async {
+            try {
+              final data = await _reportServices.fetchPurchasedReceiptDetail(
+                context: context,
+                id: receiptId,
+              );
+
+              if (!mounted) return;
+
+              detail = data;
+              receiptNoCtrl.text = data?.receiptNo ?? '';
+              noteCtrl.text = data?.note ?? '';
+              receiptDate = DateTime.parse(data?.receiptDate ?? '');
+
+              qtyCtrls.clear();
+              unitCtrls.clear();
+
+              for (final item in data?.items ?? []) {
+                qtyCtrls.add(TextEditingController(text: item.qty.toString()));
+                // debugPrint("unit cost : ${item.unitCost}");
+                unitCtrls
+                    .add(TextEditingController(text: item.unitCost.toString()));
+              }
+
+              setDialogState(() => isLoading = false);
+            } catch (e) {
+              setDialogState(() {
+                error = e.toString();
+                isLoading = false;
+              });
+            }
+          }
+
+          if (isLoading && detail == null && error == null) {
+            loadDetail();
+            // debugPrint("is control unit empty: ${unitCtrls.isEmpty.toString()}");
+          }
+
+          Future<void> submit() async {
+            if (detail == null) return;
+
+            final itemsPayload = <Map<String, dynamic>>[];
+            for (var i = 0; i < detail!.items.length; i++) {
+              final qty = double.tryParse(qtyCtrls[i].text.trim()) ?? 0;
+              final unit = double.tryParse(unitCtrls[i].text.trim()) ?? 0;
+              // debugPrint("unit value in itemspayload[] : ${unit}");
+
+              if (qty <= 0 || unit < 0) {
+                showSnackBar(context, "Qty/unit_cost invalid",
+                    bgColor: Colors.red);
+                return;
+              }
+
+              final item = detail!.items[i];
+              itemsPayload.add({
+                "id_product": item.idProduct,
+                "id_product_unit": item.idProductUnit,
+                "qty": qty,
+                "unit_cost": unit,
+              });
+            }
+
+            setDialogState(() => isSubmitting = true);
+
+            final ok = await _reportServices.updatePurchasedReceipt(
+              context: context,
+              id: detail!.id,
+              payload: {
+                "id_supplier": detail!.idSupplier,
+                "receipt_no": receiptNoCtrl.text.trim(),
+                "receipt_date": receiptDate?.toIso8601String().substring(0, 10),
+                "note": noteCtrl.text.trim(),
+                "items": itemsPayload,
+              },
+            );
+
+            setDialogState(() => isSubmitting = false);
+
+            if (ok) {
+              Navigator.pop(context);
+              await _loadPurchasedReceipts();
+              showSnackBar(context, "Receipt Updated", bgColor: Colors.green);
+            }
+          }
+
+          return AlertDialog(
+            insetPadding: const EdgeInsets.all(20),
+            backgroundColor: GlobalVariables.backgroundColor,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: const Text("Update Receipt"),
+            content: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.7,
+              height: MediaQuery.of(context).size.height * 0.7,
+              child: isLoading
+                  ? const Center(child: CustomLoading())
+                  : error != null
+                      ? Center(
+                          child: Text(error!,
+                              style: const TextStyle(color: Colors.red)))
+                      : detail == null
+                          ? const Center(child: Text("No detail found"))
+                          : SingleChildScrollView(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  TextField(
+                                    controller: receiptNoCtrl,
+                                    decoration: const InputDecoration(
+                                      labelText: "Receipt No",
+                                      border: OutlineInputBorder(),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  OutlinedButton.icon(
+                                    onPressed: () async {
+                                      final now = DateTime.now();
+                                      final picked = await showDatePicker(
+                                          context: context,
+                                          initialDate: receiptDate ?? now,
+                                          firstDate: DateTime(2020, 1, 1),
+                                          lastDate:
+                                              DateTime(now.year + 5, 12, 31));
+                                      if (picked != null) {
+                                        setDialogState(
+                                            () => receiptDate = picked);
+                                      }
+                                    },
+                                    icon: const Icon(Icons.date_range),
+                                    label: Text(receiptDate == null
+                                        ? "Pick Date"
+                                        : DateFormat('yyyy-mm-dd')
+                                            .format(receiptDate!)),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  TextField(
+                                    controller: noteCtrl,
+                                    maxLines: 2,
+                                    decoration: const InputDecoration(
+                                      labelText: "Note",
+                                      border: OutlineInputBorder(),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Text(
+                                    "Items",
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ListView.builder(
+                                    shrinkWrap: true,
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    itemCount: detail!.items.length,
+                                    itemBuilder: (context, index) {
+                                      final item = detail!.items[index];
+                                      return Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 8),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              flex: 3,
+                                              child: Text(item.productName ??
+                                                  "Product ${item.idProduct}"),
+                                            ),
+                                            const SizedBox(
+                                              width: 8,
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: TextField(
+                                                controller: qtyCtrls[index],
+                                                keyboardType:
+                                                    TextInputType.number,
+                                                decoration:
+                                                    const InputDecoration(
+                                                  labelText: "Qty",
+                                                  border: OutlineInputBorder(),
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(
+                                              width: 8,
+                                            ),
+                                            Expanded(
+                                              flex: 2,
+                                              child: TextField(
+                                                controller: unitCtrls[index],
+                                                keyboardType:
+                                                    TextInputType.number,
+                                                decoration:
+                                                    const InputDecoration(
+                                                  labelText: "Unit Cost",
+                                                  border: OutlineInputBorder(),
+                                                ),
+                                              ),
+                                            )
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                  )
+                                ],
+                              ),
+                            ),
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Cancel")),
+              ElevatedButton(
+                onPressed: isSubmitting ? null : submit,
+                child: isSubmitting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text("Save"),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -1172,6 +1522,379 @@ class _ReportScreenState extends State<ReportScreen> {
     }
     showSnackBar(context, "Invoice uploaded", bgColor: Colors.green);
     await _loadPurchasedReceipts();
+  }
+
+  Future<void> _deleteInvoice(PurchasedReceipt receipt) async {
+    final isConfirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: GlobalVariables.backgroundColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text(
+          "Delete Invoice",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Delete receipt "${receipt.receiptNo.isNotEmpty ? receipt.receiptNo : receipt.id}" permanently?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text("Delete"),
+          ),
+        ],
+      ),
+    );
+
+    if (isConfirmed != true) return;
+
+    final ok = await _reportServices.deletePurchasedReceipt(
+      context: context,
+      id: receipt.id,
+    );
+    if (!mounted) return;
+    if (ok) {
+      await _loadPurchasedReceipts();
+      showSnackBar(context, "Receipt deleted", bgColor: Colors.green);
+    }
+  }
+
+  Future<void> _showAddInvoiceDialog() async {
+    if (_isSupplierLoading || _isProductsLoading) {
+      showSnackBar(context, "Loading data...", bgColor: Colors.black87);
+      return;
+    }
+    if (_supplierError != null) {
+      showSnackBar(context, _supplierError!, bgColor: Colors.red);
+      return;
+    }
+    if (_productsError != null) {
+      showSnackBar(context, _productsError!, bgColor: Colors.red);
+      return;
+    }
+
+    final receiptNoCtrl = TextEditingController();
+    final noteCtrl = TextEditingController();
+    DateTime? receiptDate;
+    Supplier? selectedSupplier;
+    final items = <_ReceiptItemDraft>[];
+
+    void addItem() {
+      final draft = _ReceiptItemDraft();
+      if (_products.isNotEmpty) {
+        draft.productId = _products.first.id;
+        if (_products.first.units.isNotEmpty) {
+          draft.unitId = _products.first.units.first.id;
+        }
+      }
+      items.add(draft);
+    }
+
+    addItem();
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          void removeItem(int index) {
+            items[index].dispose();
+            items.removeAt(index);
+            setDialogState(() {});
+          }
+
+          Product? findProduct(int? id) {
+            return _products.where((p) => p.id == id).cast<Product?>().firstOrNull;
+          }
+
+          List<ProductUnit> unitsForProduct(int? id) {
+            final product = findProduct(id);
+            return product?.units ?? [];
+          }
+
+          Future<void> submit() async {
+            if (selectedSupplier == null) {
+              showSnackBar(context, "Select supplier", bgColor: Colors.red);
+              return;
+            }
+            if (receiptDate == null) {
+              showSnackBar(context, "Select receipt date", bgColor: Colors.red);
+              return;
+            }
+            if (items.isEmpty) {
+              showSnackBar(context, "Add at least one item",
+                  bgColor: Colors.red);
+              return;
+            }
+
+            final payloadItems = <Map<String, dynamic>>[];
+            for (final item in items) {
+              final qty = double.tryParse(item.qtyCtrl.text.trim()) ?? 0;
+              final unitCost = double.tryParse(item.unitCostCtrl.text.trim()) ?? 0;
+              if (item.productId == null ||
+                  item.unitId == null ||
+                  qty <= 0 ||
+                  unitCost < 0) {
+                showSnackBar(context, "Invalid item values",
+                    bgColor: Colors.red);
+                return;
+              }
+              payloadItems.add({
+                "id_product": item.productId,
+                "id_product_unit": item.unitId,
+                "qty": qty,
+                "unit_cost": unitCost,
+              });
+            }
+
+            final result = await _reportServices.createPurchasedReceipt(
+              context: context,
+              payload: {
+                "id_supplier": selectedSupplier!.id,
+                "receipt_no": receiptNoCtrl.text.trim(),
+                "receipt_date":
+                    DateFormat('yyyy-MM-dd').format(receiptDate!),
+                "note": noteCtrl.text.trim(),
+                "items": payloadItems,
+              },
+            );
+
+            if (result == null) {
+              showSnackBar(context, "Failed to create receipt",
+                  bgColor: Colors.red);
+              return;
+            }
+
+            if (!mounted) return;
+            Navigator.pop(context);
+            await _loadPurchasedReceipts();
+            showSnackBar(context, "Receipt created", bgColor: Colors.green);
+          }
+
+          return AlertDialog(
+            insetPadding: const EdgeInsets.all(20),
+            backgroundColor: GlobalVariables.backgroundColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            title: const Text("Add Invoice"),
+            content: SizedBox(
+              width: MediaQuery.of(context).size.width * 0.7,
+              height: MediaQuery.of(context).size.height * 0.7,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    DropdownButtonFormField<Supplier>(
+                      value: selectedSupplier,
+                      decoration: const InputDecoration(
+                        labelText: "Supplier",
+                        border: OutlineInputBorder(),
+                      ),
+                      items: _suppliers
+                          .map((s) => DropdownMenuItem(
+                                value: s,
+                                child: Text(s.name),
+                              ))
+                          .toList(),
+                      onChanged: (value) {
+                        setDialogState(() {
+                          selectedSupplier = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: receiptNoCtrl,
+                      decoration: const InputDecoration(
+                        labelText: "Receipt No",
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final now = DateTime.now();
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: receiptDate ?? now,
+                          firstDate: DateTime(2020, 1, 1),
+                          lastDate: DateTime(now.year + 5, 12, 31),
+                        );
+                        if (picked != null) {
+                          setDialogState(() => receiptDate = picked);
+                        }
+                      },
+                      icon: const Icon(Icons.date_range),
+                      label: Text(
+                        receiptDate == null
+                            ? "Pick Date"
+                            : DateFormat('yyyy-MM-dd').format(receiptDate!),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: noteCtrl,
+                      maxLines: 2,
+                      decoration: const InputDecoration(
+                        labelText: "Note",
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      "Items",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: items.length,
+                      itemBuilder: (context, index) {
+                        final item = items[index];
+                        final units = unitsForProduct(item.productId);
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    flex: 3,
+                                    child: DropdownButtonFormField<int>(
+                                      value: item.productId,
+                                      decoration: const InputDecoration(
+                                        labelText: "Product",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      items: _products
+                                          .map(
+                                            (p) => DropdownMenuItem(
+                                              value: p.id,
+                                              child: Text(p.productName),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: (value) {
+                                        setDialogState(() {
+                                          item.productId = value;
+                                          final nextUnits =
+                                              unitsForProduct(value);
+                                          item.unitId = nextUnits.isNotEmpty
+                                              ? nextUnits.first.id
+                                              : null;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    flex: 2,
+                                    child: DropdownButtonFormField<int>(
+                                      value: item.unitId,
+                                      decoration: const InputDecoration(
+                                        labelText: "Unit",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                      items: units
+                                          .map(
+                                            (u) => DropdownMenuItem(
+                                              value: u.id,
+                                              child: Text(u.nameUnit),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: (value) {
+                                        setDialogState(() {
+                                          item.unitId = value;
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    onPressed: () => removeItem(index),
+                                    icon: const Icon(Icons.remove_circle),
+                                    color: Colors.red,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    flex: 2,
+                                    child: TextField(
+                                      controller: item.qtyCtrl,
+                                      keyboardType: TextInputType.number,
+                                      decoration: const InputDecoration(
+                                        labelText: "Qty",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    flex: 2,
+                                    child: TextField(
+                                      controller: item.unitCostCtrl,
+                                      keyboardType: TextInputType.number,
+                                      decoration: const InputDecoration(
+                                        labelText: "Unit Cost",
+                                        border: OutlineInputBorder(),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: () {
+                          setDialogState(() {
+                            addItem();
+                          });
+                        },
+                        icon: const Icon(Icons.add),
+                        label: const Text("Add Item"),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Cancel"),
+              ),
+              ElevatedButton(
+                onPressed: submit,
+                child: const Text("Save"),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    for (final item in items) {
+      item.dispose();
+    }
   }
 
   Future<void> _showPurchasedReceiptDialog(int receiptId) async {
@@ -1246,8 +1969,9 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Widget _buildReceiptDetailBody(PurchasedReceipt receipt) {
-    final supplierName =
-        receipt.supplier?.name.isNotEmpty == true ? receipt.supplier!.name : "-";
+    final supplierName = receipt.supplier?.name.isNotEmpty == true
+        ? receipt.supplier!.name
+        : "-";
     String dateText = receipt.receiptDate;
     try {
       dateText = DateFormat('dd-MMM-yyyy').format(
@@ -1296,7 +2020,8 @@ class _ReportScreenState extends State<ReportScreen> {
                           ? item.productName!
                           : "Product ID: ${item.idProduct}",
                     ),
-                    subtitle: Text("Qty: ${item.qty}  |  Unit: ${item.unitCost}"),
+                    subtitle:
+                        Text("Qty: ${item.qty}  |  Unit: ${item.unitCost}"),
                     trailing: Text(format.toRupiah(item.subTotal)),
                   );
                 },
@@ -1312,14 +2037,17 @@ class _ReportScreenState extends State<ReportScreen> {
               else
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    final itemWidth = (constraints.maxWidth * 0.45).clamp(160, 320).toDouble();
+                    final itemWidth = (constraints.maxWidth * 0.45)
+                        .clamp(160, 320)
+                        .toDouble();
                     return Wrap(
                       spacing: 8,
                       runSpacing: 8,
                       children: receipt.files.map((f) {
                         final imageUrl = '$baseUrl${f.filePath}';
                         return InkWell(
-                          onTap: () => _showInvoiceImageDialog(imageUrl, f.fileName),
+                          onTap: () =>
+                              _showInvoiceImageDialog(imageUrl, f.fileName),
                           child: Container(
                             width: itemWidth,
                             decoration: BoxDecoration(
@@ -1337,7 +2065,8 @@ class _ReportScreenState extends State<ReportScreen> {
                                     imageUrl,
                                     height: 140,
                                     fit: BoxFit.cover,
-                                    errorBuilder: (context, error, stack) => Container(
+                                    errorBuilder: (context, error, stack) =>
+                                        Container(
                                       height: 140,
                                       color: Colors.grey.shade200,
                                       alignment: Alignment.center,
@@ -1777,4 +2506,16 @@ class _ProductSalesDataSource extends DataTableSource {
 
   @override
   int get selectedRowCount => 0;
+}
+
+class _ReceiptItemDraft {
+  int? productId;
+  int? unitId;
+  final TextEditingController qtyCtrl = TextEditingController();
+  final TextEditingController unitCostCtrl = TextEditingController();
+
+  void dispose() {
+    qtyCtrl.dispose();
+    unitCostCtrl.dispose();
+  }
 }

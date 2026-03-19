@@ -87,7 +87,7 @@ purchasedReceiptRouter.post("/api/purchased-receipts", auth, async (req, res) =>
 purchasedReceiptRouter.get("/api/purchased-receipts", auth, async (req, res) => {
   try {
     const rows = await PurchasedReceipt.findAll({
-      include: [{ model: Supplier, required: false }],
+      include: [{ model: Supplier, as: "supplier", required: false }],
       order: [["receipt_date", "DESC"]],
     });
     res.json(rows);
