@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ffi';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -511,7 +512,7 @@ class ReportServices {
     return result;
   }
 
-  Future<Supplier?> createSupplier({
+  Future<bool> createSupplier({
     required BuildContext context,
     required String supplierName,
     String? company,
@@ -519,7 +520,8 @@ class ReportServices {
     String? address,
   }) async {
     final uri = Uri.parse('$baseUrl/api/suppliers');
-    Supplier? result;
+    // Supplier? result;
+    bool isSuccess = false;
 
     try {
       final res = await http.post(
@@ -536,11 +538,12 @@ class ReportServices {
         response: res,
         context: context,
         onSuccess: () {
-          final decoded = jsonDecode(res.body) as Map<String, dynamic>;
-          final data = decoded["data"];
-          if (data is Map<String, dynamic>) {
-            result = Supplier.fromMap(data);
-          }
+          isSuccess = true;
+          showSnackBar(
+            context,
+            "Supplier created successfully",
+            bgColor: Colors.green,
+          );
         },
       );
     } catch (e) {
@@ -548,6 +551,84 @@ class ReportServices {
       showSnackBar(context, e.toString(), bgColor: Colors.red);
     }
 
-    return result;
+    return isSuccess;
   }
+
+  Future<bool> updateSupplier({
+    required BuildContext context,
+    required String supplierName,
+    required int id,
+    String? company,
+    String? phone,
+    String? address,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/suppliers/$id');
+    // Supplier? result;
+    bool isSuccess = false;
+
+    try {
+      final res = await http.put(
+        uri,
+        headers: _authHeaders(context),
+        body: jsonEncode({
+          "supplier_name": supplierName,
+          "company": company,
+          "phone": phone,
+          "address": address,
+        }),
+      );
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          isSuccess = true;
+          showSnackBar(
+            context,
+            "Supplier Updated successfully",
+            bgColor: Colors.green,
+          );
+        },
+      );
+    } catch (e) {
+      debugPrint(e.toString());
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
+    }
+
+    return isSuccess;
+  }
+
+  Future<bool> deleteSupplier({
+    required BuildContext context,
+    required int id,
+  }) async {
+    final uri = Uri.parse('$baseUrl/api/suppliers/$id');
+    // Supplier? result;
+    bool isSuccess = false;
+
+    try {
+      final res = await http.delete(
+        uri,
+        headers: _authHeaders(context),
+      );
+      httpErrorhandle(
+        response: res,
+        context: context,
+        onSuccess: () {
+          isSuccess = true;
+          showSnackBar(
+            context,
+            "Supplier Deleted successfully",
+            bgColor: Colors.green,
+          );
+        },
+      );
+    } catch (e) {
+      debugPrint(e.toString());
+      showSnackBar(context, e.toString(), bgColor: Colors.red);
+    }
+
+    return isSuccess;
+  }
+
+  
 }

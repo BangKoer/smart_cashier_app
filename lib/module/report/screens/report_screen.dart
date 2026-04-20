@@ -9,6 +9,7 @@ import 'package:smart_cashier_app/models/purchased_receipt.dart';
 import 'package:smart_cashier_app/models/product.dart';
 import 'package:smart_cashier_app/models/product_unit.dart';
 import 'package:smart_cashier_app/models/supplier.dart';
+import 'package:smart_cashier_app/module/report/screens/supplier_screen.dart';
 import 'package:smart_cashier_app/module/report/services/report_services.dart';
 import 'package:smart_cashier_app/module/products/services/products_services.dart';
 import 'package:smart_cashier_app/utils/format_rupiah.dart' as format;
@@ -499,7 +500,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
         return Wrap(
           spacing: spacing,
-          runSpacing: spacing,
+          // runSpacing: spacing,
           children: [
             _buildKpiCard(
               title: "Total Transaction",
@@ -1071,17 +1072,40 @@ class _ReportScreenState extends State<ReportScreen> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: ElevatedButton.icon(
-                onPressed: _showAddInvoiceDialog,
-                icon: const Icon(Icons.add),
-                label: const Text("Add Invoice"),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  foregroundColor: Colors.white,
+            Row(
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: ElevatedButton.icon(
+                    onPressed: _showAddInvoiceDialog,
+                    icon: const Icon(Icons.add),
+                    label: const Text("Add Invoice"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(width: 10),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => SupplierScreen(),
+                          ));
+                    },
+                    icon: const Icon(Icons.person),
+                    label: const Text("Supplier"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: GlobalVariables.thirdColor,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 10),
             _buildPurchasedReceiptsTable(),
@@ -1567,6 +1591,8 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
+  
+
   Future<void> _showAddInvoiceDialog() async {
     if (_isSupplierLoading || _isProductsLoading) {
       showSnackBar(context, "Loading data...", bgColor: Colors.black87);
@@ -1611,7 +1637,10 @@ class _ReportScreenState extends State<ReportScreen> {
           }
 
           Product? findProduct(int? id) {
-            return _products.where((p) => p.id == id).cast<Product?>().firstOrNull;
+            return _products
+                .where((p) => p.id == id)
+                .cast<Product?>()
+                .firstOrNull;
           }
 
           List<ProductUnit> unitsForProduct(int? id) {
@@ -1637,7 +1666,8 @@ class _ReportScreenState extends State<ReportScreen> {
             final payloadItems = <Map<String, dynamic>>[];
             for (final item in items) {
               final qty = double.tryParse(item.qtyCtrl.text.trim()) ?? 0;
-              final unitCost = double.tryParse(item.unitCostCtrl.text.trim()) ?? 0;
+              final unitCost =
+                  double.tryParse(item.unitCostCtrl.text.trim()) ?? 0;
               if (item.productId == null ||
                   item.unitId == null ||
                   qty <= 0 ||
@@ -1659,8 +1689,7 @@ class _ReportScreenState extends State<ReportScreen> {
               payload: {
                 "id_supplier": selectedSupplier!.id,
                 "receipt_no": receiptNoCtrl.text.trim(),
-                "receipt_date":
-                    DateFormat('yyyy-MM-dd').format(receiptDate!),
+                "receipt_date": DateFormat('yyyy-MM-dd').format(receiptDate!),
                 "note": noteCtrl.text.trim(),
                 "items": payloadItems,
               },
