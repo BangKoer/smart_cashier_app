@@ -14,8 +14,21 @@ class UserProvider extends ChangeNotifier {
   User get user => _user;
 
   // Parameter using data type string instead User because were going to pass json body which is String.
-  void setUser(String user){
+  void setUser(String user) {
     _user = User.fromJson(user);
     notifyListeners();
-  } 
+  }
+
+  void clearUser() {
+    _user = User(
+        id: '',
+        name: '',
+        email: '',
+        password: '',
+        role: '',
+        token: '',
+        createdAt: null);
+
+    notifyListeners();    
+  }
 }

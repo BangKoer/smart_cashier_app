@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:smart_cashier_app/common/widgets/custom_info_panel.dart';
 import 'package:smart_cashier_app/constant/global_variables.dart';
+import 'package:smart_cashier_app/module/auth/services/auth_services.dart';
 import 'package:smart_cashier_app/module/cashier/screens/cashier_screen.dart';
 import 'package:smart_cashier_app/module/report/screens/report_screen.dart';
 import 'package:smart_cashier_app/module/sales/screens/sales_screen.dart';
@@ -18,6 +20,7 @@ class CustomSidebarHome extends StatefulWidget {
 class _CustomSidebarHomeState extends State<CustomSidebarHome> {
   int _page = 0;
   late List<Widget> _pages;
+  final AuthServices _authServices = AuthServices();
 
   @override
   void initState() {
@@ -33,49 +36,29 @@ class _CustomSidebarHomeState extends State<CustomSidebarHome> {
 
   @override
   Widget build(BuildContext context) {
-    final bool isWideScreen = MediaQuery.of(context).size.width >= 700;
-
-    Widget drawerContent = Drawer(
-      backgroundColor: Colors.white,
-      child: ListView(
-        children: [
-          DrawerHeader(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Image.asset(
-                  'assets/smartlogo.png',
-                  scale: 25,
-                ),
-                SizedBox(
-                  height: 10,
-                ),
-                Image.asset(
-                  'assets/smarttext.png',
-                  scale: 20,
-                ),
-              ],
-            ),
-          ),
-          _buildDrawerItem(Icons.point_of_sale, "Cashier", 0),
-          _buildDrawerItem(Icons.inventory, "Product", 1),
-          _buildDrawerItem(Icons.file_copy, "Purchased Note", 2),
-          _buildDrawerItem(Icons.analytics, "Sales Report", 3),
-        ],
-      ),
-    );
+    // final bool isWideScreen = MediaQuery.of(context).size.width >= 700;
+    final userName = context.watch<UserProvider>().user.name;
     return Scaffold(
       appBar: AppBar(
+        scrolledUnderElevation: 0,
+        surfaceTintColor: Colors.transparent,
+        shadowColor: Colors.transparent,
         foregroundColor: GlobalVariables.secondaryColor,
         backgroundColor: GlobalVariables.backgroundColor,
         title: Image.asset(
           'assets/smarttext.png',
           scale: 13,
         ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: TopInfoPanel(userName: userName),
+          )
+        ],
         centerTitle: true,
         toolbarHeight: 100,
       ),
-      drawer: isWideScreen ? drawerContent : drawerContent,
+      drawer: drawerContent(context),
       body: Row(
         children: [
           // if (isWideScreen)
@@ -103,6 +86,74 @@ class _CustomSidebarHomeState extends State<CustomSidebarHome> {
               },
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  void Logout() async {
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text("Logout"),
+        content: const Text("Are you sure want to logout ?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Logout"),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLogout == true) {
+      await _authServices.logoutUser(context);
+    }
+  }
+
+  Widget drawerContent(BuildContext context) {
+    return Drawer(
+      backgroundColor: Colors.white,
+      child: ListView(
+        children: [
+          DrawerHeader(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  'assets/smartlogo.png',
+                  scale: 25,
+                ),
+                SizedBox(
+                  height: 10,
+                ),
+                Image.asset(
+                  'assets/smarttext.png',
+                  scale: 20,
+                ),
+              ],
+            ),
+          ),
+          _buildDrawerItem(Icons.point_of_sale, "Cashier", 0),
+          _buildDrawerItem(Icons.inventory, "Product", 1),
+          _buildDrawerItem(Icons.file_copy, "Purchased Note", 2),
+          _buildDrawerItem(Icons.analytics, "Sales Report", 3),
+          const Divider(),
+          ListTile(
+            leading: const Icon(
+              Icons.logout,
+              color: Colors.red,
+            ),
+            title: const Text(
+              "Logout",
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            ),
+            onTap: Logout,
+          )
         ],
       ),
     );

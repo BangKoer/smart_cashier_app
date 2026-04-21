@@ -54,7 +54,7 @@ class _SupplierScreenState extends State<SupplierScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          title: const Text("Add Supplier"),
+          title:  Text(isEdit ? "Update Supplier" : "Add Supplier"),
           content: SizedBox(
             width: MediaQuery.of(context).size.width * 0.3,
             // height: MediaQuery.of(context).size.height * 0.3,
@@ -110,23 +110,19 @@ class _SupplierScreenState extends State<SupplierScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.pop(context, false);
-              },
+              onPressed: () => Navigator.pop(context, false),
               child: const Text("Cancel"),
             ),
             ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context, true);
-              },
-              child: Text(isEdit ? "Update" : "Save"),
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(isEdit ? "Update" : "Add"),
             ),
           ],
         );
       },
     );
 
-    if (shouldSubmit != true && _nameC.text.trim().isEmpty) return;
+    if (shouldSubmit != true || _nameC.text.trim().isEmpty) return;
 
     final isSuccess = isEdit
         ? await _reportServices.updateSupplier(
@@ -209,114 +205,117 @@ class _SupplierScreenState extends State<SupplierScreen> {
       body: Padding(
         padding: EdgeInsets.symmetric(
             horizontal: isWideScreen ? 50.0 : 12.0, vertical: 10),
-        child: Container(
-          height: MediaQuery.of(context).size.height,
-          width: isWideScreen ? screenSizeWidth * 0.7 : null,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Title
-              const Text(
-                "List of Suppliers",
-                style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.bold,
-                  color: GlobalVariables.thirdColor,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Title
+            const Text(
+              "List of Suppliers",
+              style: TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.bold,
+                color: GlobalVariables.thirdColor,
+              ),
+            ),
+            const SizedBox(
+              height: 10,
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: ElevatedButton.icon(
+                onPressed: () => _showSupplierDialog(),
+                icon: const Icon(Icons.add),
+                label: const Text("Add Supplier"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: GlobalVariables.thirdColor,
+                  foregroundColor: Colors.white,
                 ),
               ),
-              const SizedBox(
-                height: 10,
-              ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: ElevatedButton.icon(
-                  onPressed: () => _showSupplierDialog(),
-                  icon: const Icon(Icons.add),
-                  label: const Text("Add Supplier"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: GlobalVariables.thirdColor,
-                    foregroundColor: Colors.white,
+            ),
+            const SizedBox(height: 10),
+        
+            // Categories table
+            Card(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.vertical,
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+        
+                  child: Column(
+                    children: [
+                      DataTable(
+                        // dataRowMinHeight: 24,
+                        columns: const [
+                          DataColumn(label: Text("No")),
+                          DataColumn(label: Text("Name")),
+                          DataColumn(label: Text("Phone")),
+                          DataColumn(label: Text("Company")),
+                          DataColumn(label: Text("Address")),
+                          DataColumn(label: Text("Action")),
+                        ],
+                        rows: List.generate(
+                          suppliers.isEmpty ? 1 : suppliers.length,
+                          (index) {
+                            if (suppliers.isEmpty) {
+                              return const DataRow(cells: [
+                                DataCell(Text('-')),
+                                DataCell(Text('-')),
+                                DataCell(
+                                    Text('No Supllier match current filters')),
+                                DataCell(Text('-')),
+                                DataCell(Text('-')),
+                                DataCell(Text('-')),
+                              ]);
+                            }
+                  
+                            final supplier = suppliers[index];
+                            return DataRow(cells: [
+                              DataCell(Text('${++index}')),
+                              DataCell(Text('${supplier.name}')),
+                              DataCell(Text('${supplier.phone}')),
+                              DataCell(Text('${supplier.company}')),
+                              DataCell(Text('${supplier.address}')),
+                              DataCell(Row(
+                                children: [
+                                  IconButton(
+                                    onPressed: () {
+                                      _showSupplierDialog(supplier: supplier);
+                                    },
+                                    icon: const Icon(Icons.edit),
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: Colors.yellow,
+                                      shape: const RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.all(Radius.circular(5)),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 5),
+                                  IconButton(
+                                    onPressed: () {
+                                      _confirmDeleteSupplier(supplier);
+                                    },
+                                    icon: const Icon(Icons.delete_forever),
+                                    style: IconButton.styleFrom(
+                                      backgroundColor: Colors.red,
+                                      shape: const RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.all(Radius.circular(5)),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              )),
+                            ]);
+                          },
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
-
-              // Categories table
-              Card(
-                child: Column(
-                  children: [
-                    DataTable(
-                      dataRowMinHeight: 24,
-                      columns: const [
-                        DataColumn(label: Text("No")),
-                        DataColumn(label: Text("Name")),
-                        DataColumn(label: Text("Phone")),
-                        DataColumn(label: Text("Company")),
-                        DataColumn(label: Text("Address")),
-                        DataColumn(label: Text("Action")),
-                      ],
-                      rows: List.generate(
-                        suppliers.isEmpty ? 1 : suppliers.length,
-                        (index) {
-                          if (suppliers.isEmpty) {
-                            return const DataRow(cells: [
-                              DataCell(Text('-')),
-                              DataCell(Text('-')),
-                              DataCell(
-                                  Text('No Supllier match current filters')),
-                              DataCell(Text('-')),
-                              DataCell(Text('-')),
-                              DataCell(Text('-')),
-                            ]);
-                          }
-
-                          final supplier = suppliers[index];
-                          return DataRow(cells: [
-                            DataCell(Text('${++index}')),
-                            DataCell(Text('${supplier.name}')),
-                            DataCell(Text('${supplier.phone}')),
-                            DataCell(Text('${supplier.company}')),
-                            DataCell(Text('${supplier.address}')),
-                            DataCell(Row(
-                              children: [
-                                IconButton(
-                                  onPressed: () {
-                                    _showSupplierDialog(supplier: supplier);
-                                  },
-                                  icon: const Icon(Icons.edit),
-                                  style: IconButton.styleFrom(
-                                    backgroundColor: Colors.yellow,
-                                    shape: const RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.all(Radius.circular(5)),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 5),
-                                IconButton(
-                                  onPressed: () {
-                                    _confirmDeleteSupplier(supplier);
-                                  },
-                                  icon: const Icon(Icons.delete_forever),
-                                  style: IconButton.styleFrom(
-                                    backgroundColor: Colors.red,
-                                    shape: const RoundedRectangleBorder(
-                                      borderRadius:
-                                          BorderRadius.all(Radius.circular(5)),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            )),
-                          ]);
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            ],
-          ),
+            )
+          ],
         ),
       ),
     );

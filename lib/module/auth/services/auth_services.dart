@@ -11,6 +11,7 @@ import 'package:smart_cashier_app/constant/global_variables.dart';
 import 'package:smart_cashier_app/constant/utils.dart';
 import 'package:smart_cashier_app/models/user.dart';
 import 'package:http/http.dart' as http;
+import 'package:smart_cashier_app/module/auth/screens/auth_screen.dart';
 import 'package:smart_cashier_app/module/home/screens/home_screen.dart';
 import 'package:smart_cashier_app/providers/user_provider.dart';
 
@@ -135,6 +136,35 @@ class AuthServices {
       );
       // ignore: avoid_print
       print(e.toString());
+    }
+  }
+
+  Future<void> logoutUser(BuildContext context) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('x-auth-token');
+
+      if (!context.mounted) return;
+      Provider.of<UserProvider>(context, listen: false).clearUser();
+
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AuthScreen.routeName,
+        (route) => false,
+      );
+
+      showSnackBar(
+        context,
+        "Logout Success",
+        bgColor: Colors.green,
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      showSnackBar(
+        context,
+        e.toString(),
+        bgColor: Colors.red,
+      );
     }
   }
 }

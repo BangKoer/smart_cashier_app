@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 
-String baseUrl = 'http://192.168.159.140:3000';
+// String baseUrl = 'http://192.168.254.140:3000';
+
+const String baseUrl = String.fromEnvironment(
+  'BASE_URL',
+  defaultValue: 'http://127.0.0.1:3000',
+);
 
 class GlobalVariables {
   // For storing api base url

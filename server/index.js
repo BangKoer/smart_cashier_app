@@ -33,6 +33,10 @@ sequelize.authenticate()
     .then(() => console.log("MySQL Connected✅"))
     .catch((e) => console.log(e));
 
-app.listen(PORT, "0.0.0.0", () => {
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ ok: true });
+});
+
+app.listen(PORT, "127.0.0.1", () => {
     console.log(`Server running at port ${PORT}`);
 })
