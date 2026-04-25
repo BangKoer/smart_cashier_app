@@ -7,6 +7,8 @@ import 'package:smart_cashier_app/module/cashier/screens/cashier_screen.dart';
 import 'package:smart_cashier_app/module/report/screens/report_screen.dart';
 import 'package:smart_cashier_app/module/sales/screens/sales_screen.dart';
 import 'package:smart_cashier_app/module/products/screens/produtcs_screen.dart';
+import 'package:smart_cashier_app/module/sales/services/sales_services.dart';
+import 'package:smart_cashier_app/module/sales/viewmodel/sales_view_model.dart';
 import 'package:smart_cashier_app/providers/user_provider.dart';
 
 class CustomSidebarHome extends StatefulWidget {
@@ -29,7 +31,10 @@ class _CustomSidebarHomeState extends State<CustomSidebarHome> {
     _pages = [
       const CashierScreen(),
       const ProdutcsScreen(),
-      const Sales(),
+      ChangeNotifierProvider(
+        create: (_) => SalesVM(SalesServices()),
+        child: const Sales(),
+      ),
       const ReportScreen(),
     ];
   }

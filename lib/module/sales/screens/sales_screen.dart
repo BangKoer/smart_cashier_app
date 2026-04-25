@@ -3,7 +3,9 @@ import 'package:smart_cashier_app/constant/global_variables.dart';
 import 'package:smart_cashier_app/module/cashier/screens/cashier_screen.dart';
 import 'package:smart_cashier_app/models/sales.dart' as sales_model;
 import 'package:smart_cashier_app/module/sales/services/sales_services.dart';
+import 'package:smart_cashier_app/module/sales/viewmodel/sales_view_model.dart';
 import 'package:smart_cashier_app/utils/format_rupiah.dart' as format;
+import 'package:provider/provider.dart';
 
 class Sales extends StatefulWidget {
   static const String routeName = 'note-screen';
@@ -15,100 +17,27 @@ class Sales extends StatefulWidget {
 
 class _SalesState extends State<Sales> {
   final TextEditingController _searchNoteController = TextEditingController();
-  final SalesServices salesServices = SalesServices();
-  List<sales_model.Sales> salesList = [];
-  bool isLoading = true;
-  String _searchQuery = '';
-  String _selectedSortFilter = 'date_desc';
-  String _selectedPaymentStatusFilter = 'all';
-
-  Future<void> _fetchSales() async {
-    setState(() => isLoading = true);
-    salesList = await salesServices.fetchAllSales(context: context);
-    if (!mounted) return;
-    setState(() => isLoading = false);
-  }
-
-  List<sales_model.Sales> _getFilteredSales() {
-    final filtered = salesList.where((sales) {
-      final matchPaymentStatus = _selectedPaymentStatusFilter == 'all' ||
-          sales.payment_status == _selectedPaymentStatusFilter;
-      if (!matchPaymentStatus) return false;
-
-      if (_searchQuery.isEmpty) return true;
-
-      final search = _searchQuery.toLowerCase();
-      final byId = sales.id.toString().contains(search);
-      final byCustomer =
-          (sales.customer_name ?? '').toLowerCase().contains(search);
-      final byPayment = sales.payment_method.toLowerCase().contains(search) ||
-          sales.payment_status.toLowerCase().contains(search);
-      final byItem = sales.salesItems.any((item) {
-        final product = (item.product_name ?? '').toLowerCase();
-        final unit = (item.product_unit ?? '').toLowerCase();
-        return product.contains(search) || unit.contains(search);
-      });
-
-      return byId || byCustomer || byPayment || byItem;
-    }).toList();
-
-    switch (_selectedSortFilter) {
-      case 'date_asc':
-        filtered.sort(
-            (a, b) => _toDate(a.created_at).compareTo(_toDate(b.created_at)));
-        break;
-      case 'total_asc':
-        filtered.sort((a, b) => a.total_price.compareTo(b.total_price));
-        break;
-      case 'total_desc':
-        filtered.sort((a, b) => b.total_price.compareTo(a.total_price));
-        break;
-      default:
-        filtered.sort(
-            (a, b) => _toDate(b.created_at).compareTo(_toDate(a.created_at)));
-    }
-
-    return filtered;
-  }
-
-  DateTime _toDate(String input) => DateTime.tryParse(input) ?? DateTime(1970);
-
-  String _formatDate(String input) {
-    final dt = _toDate(input);
-    return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}';
-  }
-
-  void _resetTableFilters() {
-    setState(() {
-      _selectedSortFilter = 'date_desc';
-      _selectedPaymentStatusFilter = 'all';
-      _searchQuery = '';
-      _searchNoteController.clear();
-    });
-  }
-
-  String _formatQty(double qty) {
-    if (qty == qty.toInt()) {
-      return qty.toInt().toString();
-    }
-    return qty.toString();
-  }
+  // final SalesServices salesServices = SalesServices();
 
   Future<void> _confirmDeleteSales(sales_model.Sales sales) async {
-    final bool? confirm = await showDialog<bool>(
+    final vm = context.read<SalesVM>();
+    await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Delete Sales"),
         content: Text(
-          "Delete sales note #${sales.id}? This action cannot be undone.",
+          "Delete sales note ${sales.customer_name}? This action cannot be undone.",
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(context),
             child: const Text("Cancel"),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () {
+              vm.deleteSales(context, sales.id);
+              Navigator.pop(context);
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
@@ -118,15 +47,6 @@ class _SalesState extends State<Sales> {
         ],
       ),
     );
-
-    if (confirm != true) return;
-    final isDeleted = await salesServices.deleteSales(
-      context: context,
-      id: sales.id,
-    );
-    if (isDeleted && mounted) {
-      _fetchSales();
-    }
   }
 
   void _showSalesDetailDialog(sales_model.Sales sales) {
@@ -148,7 +68,8 @@ class _SalesState extends State<Sales> {
               ),
               const SizedBox(height: 12),
               Text('No. Nota: ${sales.id}'),
-              Text('Date: ${_formatDate(sales.created_at)}'),
+              Text(
+                  'Date: ${context.read<SalesVM>().formatDate(sales.created_at)}'),
               Text(
                   'Customer: ${sales.customer_name?.isNotEmpty == true ? sales.customer_name : '-'}'),
               Text(
@@ -207,13 +128,17 @@ class _SalesState extends State<Sales> {
                             cells: [
                               DataCell(Text(item.product_name ??
                                   'Product #${item.id_product}')),
-                              DataCell(Text(_formatQty(item.quantity))),
+                              DataCell(Text(context
+                                  .read<SalesVM>()
+                                  .formatQty(item.quantity))),
                               DataCell(Text(item.product_unit ??
                                   'Unit #${item.id_product_unit}')),
+                              DataCell(Text(
+                                  format.toRupiah(item.unit_price_snapshot))),
+                              DataCell(Text(
+                                  "${context.read<SalesVM>().formatQty(item.discount_percent)} %")),
                               DataCell(
-                                  Text(format.toRupiah(item.unit_price_snapshot))),
-                              DataCell(Text("${_formatQty(item.discount_percent)} %")),
-                              DataCell(Text(format.toRupiah(item.discount_amount))),
+                                  Text(format.toRupiah(item.discount_amount))),
                               DataCell(Text(format.toRupiah(item.sub_total))),
                             ],
                           );
@@ -239,7 +164,12 @@ class _SalesState extends State<Sales> {
   @override
   void initState() {
     super.initState();
-    _fetchSales();
+    Future.microtask(
+      () {
+        context.read<SalesVM>().fetchSales(context);
+      },
+    );
+    // _fetchSales();
   }
 
   @override
@@ -250,9 +180,10 @@ class _SalesState extends State<Sales> {
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.read<SalesVM>();
     double screenSizeWidth = MediaQuery.of(context).size.width;
     bool isWideScreen = screenSizeWidth > 950;
-    final filteredSales = _getFilteredSales();
+    final filteredSales = vm.getFilteredSales();
 
     return Scaffold(
       body: Padding(
@@ -277,7 +208,7 @@ class _SalesState extends State<Sales> {
               ),
 
               // Search Purchased Note
-              _CustomTextfieldSalesScreen(),
+              _CustomTextfieldSalesScreen(context),
               const SizedBox(height: 10),
 
               // Filter
@@ -285,10 +216,10 @@ class _SalesState extends State<Sales> {
               const SizedBox(height: 10),
 
               Expanded(
-                child: isLoading
+                child: vm.isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : RefreshIndicator(
-                        onRefresh: _fetchSales,
+                        onRefresh: () => vm.fetchSales(context),
                         child: SingleChildScrollView(
                           physics: const AlwaysScrollableScrollPhysics(),
                           child: _buildSalesTable(filteredSales),
@@ -303,13 +234,11 @@ class _SalesState extends State<Sales> {
   }
 
   // ignore: non_constant_identifier_names
-  TextField _CustomTextfieldSalesScreen() {
+  TextField _CustomTextfieldSalesScreen(BuildContext context) {
     return TextField(
       controller: _searchNoteController,
-      onChanged: (searchItem) {
-        _searchQuery = searchItem.trim();
-        setState(() {});
-      },
+      onChanged: (searchItem) =>
+          context.read<SalesVM>().setFilterQuery(searchQueryValue: searchItem),
       decoration: const InputDecoration(
         labelText: "Search Note",
         border: OutlineInputBorder(),
@@ -319,6 +248,7 @@ class _SalesState extends State<Sales> {
   }
 
   Widget _buildProductFilters() {
+    final vm = context.watch<SalesVM>();
     return Container(
       width: MediaQuery.of(context).size.width,
       child: Wrap(
@@ -330,7 +260,7 @@ class _SalesState extends State<Sales> {
           SizedBox(
             width: 250,
             child: DropdownButtonFormField<String>(
-              value: _selectedSortFilter,
+              value: vm.selectedSortFilter,
               decoration: const InputDecoration(
                 labelText: "Sort By",
                 border: OutlineInputBorder(),
@@ -347,7 +277,7 @@ class _SalesState extends State<Sales> {
               ],
               onChanged: (value) {
                 setState(() {
-                  _selectedSortFilter = value ?? 'date_desc';
+                  vm.selectedSortFilter = value ?? 'date_desc';
                 });
               },
             ),
@@ -355,7 +285,7 @@ class _SalesState extends State<Sales> {
           SizedBox(
             width: 220,
             child: DropdownButtonFormField<String>(
-              value: _selectedPaymentStatusFilter,
+              value: vm.selectedPaymentStatusFilter,
               decoration: const InputDecoration(
                 labelText: "Payment Status",
                 border: OutlineInputBorder(),
@@ -368,13 +298,16 @@ class _SalesState extends State<Sales> {
               ],
               onChanged: (value) {
                 setState(() {
-                  _selectedPaymentStatusFilter = value ?? 'all';
+                  vm.selectedPaymentStatusFilter = value ?? 'all';
                 });
               },
             ),
           ),
           OutlinedButton.icon(
-            onPressed: _resetTableFilters,
+            onPressed: () {
+              context.read<SalesVM>().resetTableFilters();
+              _searchNoteController.clear();
+            },
             icon: const Icon(Icons.restart_alt),
             label: const Text("Reset"),
           ),
@@ -384,6 +317,7 @@ class _SalesState extends State<Sales> {
   }
 
   Widget _buildSalesTable(List<sales_model.Sales> list) {
+    final vm = context.watch<SalesVM>();
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -425,7 +359,7 @@ class _SalesState extends State<Sales> {
                     final sales = list[index];
                     return DataRow(
                       cells: [
-                        DataCell(Text(_formatDate(sales.created_at))),
+                        DataCell(Text(vm.formatDate(sales.created_at))),
                         DataCell(Text((sales.customer_name == null ||
                                 sales.customer_name!.isEmpty)
                             ? '-'
@@ -471,7 +405,8 @@ class _SalesState extends State<Sales> {
                                     ),
                                   );
                                   if (isUpdated == true && mounted) {
-                                    _fetchSales();
+                                    context.read<SalesVM>().fetchSales(context);
+                                    // _fetchSales();
                                   }
                                 },
                                 icon: const Icon(Icons.edit),
