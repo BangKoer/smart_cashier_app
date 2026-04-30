@@ -4,7 +4,10 @@ import 'package:smart_cashier_app/common/widgets/custom_info_panel.dart';
 import 'package:smart_cashier_app/constant/global_variables.dart';
 import 'package:smart_cashier_app/module/auth/services/auth_services.dart';
 import 'package:smart_cashier_app/module/cashier/screens/cashier_screen.dart';
+import 'package:smart_cashier_app/module/products/services/products_services.dart';
 import 'package:smart_cashier_app/module/report/screens/report_screen.dart';
+import 'package:smart_cashier_app/module/report/services/report_services.dart';
+import 'package:smart_cashier_app/module/report/viewmodel/report_view_model.dart';
 import 'package:smart_cashier_app/module/sales/screens/sales_screen.dart';
 import 'package:smart_cashier_app/module/products/screens/produtcs_screen.dart';
 import 'package:smart_cashier_app/module/sales/services/sales_services.dart';
@@ -32,10 +35,16 @@ class _CustomSidebarHomeState extends State<CustomSidebarHome> {
       const CashierScreen(),
       const ProdutcsScreen(),
       ChangeNotifierProvider(
-        create: (_) => SalesVM(SalesServices()),
+        create: (_) => SalesViewModel(SalesServices()),
         child: const Sales(),
       ),
-      const ReportScreen(),
+      ChangeNotifierProvider(
+        create: (_) => ReportViewModel(
+          ReportServices(),
+          ProductServices(),
+        ),
+        child: const ReportScreen(),
+      ),
     ];
   }
 

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:smart_cashier_app/constant/global_variables.dart';
 import 'package:smart_cashier_app/models/supplier.dart';
-import 'package:smart_cashier_app/module/report/services/report_services.dart';
+import 'package:smart_cashier_app/module/report/viewmodel/report_view_model.dart';
 
 class SupplierScreen extends StatefulWidget {
   const SupplierScreen({super.key});
@@ -11,9 +12,6 @@ class SupplierScreen extends StatefulWidget {
 }
 
 class _SupplierScreenState extends State<SupplierScreen> {
-  bool _isLoading = true;
-  final ReportServices _reportServices = ReportServices();
-  List<Supplier> suppliers = [];
   final TextEditingController _nameC = TextEditingController();
   final TextEditingController _phoneC = TextEditingController();
   final TextEditingController _companyC = TextEditingController();
@@ -22,22 +20,12 @@ class _SupplierScreenState extends State<SupplierScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchAllSuppliers();
-  }
-
-  Future<void> _fetchAllSuppliers() async {
-    setState(() {
-      _isLoading = true;
-    });
-    final fetched = await _reportServices.fetchSuppliers(context: context);
-    if (!mounted) return;
-    setState(() {
-      suppliers = fetched;
-      _isLoading = false;
-    });
+    Future.microtask(
+        () => context.read<ReportViewModel>().loadSuppliers(context));
   }
 
   Future<void> _showSupplierDialog({Supplier? supplier}) async {
+    final vm = context.read<ReportViewModel>();
     final bool isEdit = supplier != null;
     if (isEdit) {
       _nameC.text = supplier.name;
@@ -54,7 +42,7 @@ class _SupplierScreenState extends State<SupplierScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
-          title:  Text(isEdit ? "Update Supplier" : "Add Supplier"),
+          title: Text(isEdit ? "Update Supplier" : "Add Supplier"),
           content: SizedBox(
             width: MediaQuery.of(context).size.width * 0.3,
             // height: MediaQuery.of(context).size.height * 0.3,
@@ -124,34 +112,25 @@ class _SupplierScreenState extends State<SupplierScreen> {
 
     if (shouldSubmit != true || _nameC.text.trim().isEmpty) return;
 
-    final isSuccess = isEdit
-        ? await _reportServices.updateSupplier(
-            context: context,
-            id: supplier.id,
-            supplierName: _nameC.text,
-            phone: _phoneC.text,
-            company: _companyC.text,
-            address: _addressC.text,
-          )
-        : await _reportServices.createSupplier(
-            context: context,
-            supplierName: _nameC.text,
-            phone: _phoneC.text,
-            company: _companyC.text,
-            address: _addressC.text,
-          );
+    final isSuccess = await vm.saveSupplier(
+      context: context,
+      supplier: supplier,
+      supplierName: _nameC.text,
+      phone: _phoneC.text,
+      company: _companyC.text,
+      address: _addressC.text,
+    );
 
     _nameC.clear();
     _phoneC.clear();
     _companyC.clear();
     _addressC.clear();
 
-    if (isSuccess && mounted) {
-      _fetchAllSuppliers();
-    }
+    if (!isSuccess || !mounted) return;
   }
 
   Future<void> _confirmDeleteSupplier(Supplier supplier) async {
+    final vm = context.read<ReportViewModel>();
     final bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -177,13 +156,11 @@ class _SupplierScreenState extends State<SupplierScreen> {
 
     if (confirm != true) return;
 
-    final isSuccess = await _reportServices.deleteSupplier(
+    final isSuccess = await vm.removeSupplier(
       context: context,
       id: supplier.id,
     );
-    if (isSuccess && mounted) {
-      _fetchAllSuppliers();
-    }
+    if (!isSuccess || !mounted) return;
   }
 
   @override
@@ -198,6 +175,10 @@ class _SupplierScreenState extends State<SupplierScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<ReportViewModel>();
+    final suppliers = vm.suppliers;
+    final isLoading = vm.isSupplierLoading;
+
     double screenSizeWidth = MediaQuery.of(context).size.width;
     bool isWideScreen = screenSizeWidth > 950;
     return Scaffold(
@@ -233,87 +214,92 @@ class _SupplierScreenState extends State<SupplierScreen> {
               ),
             ),
             const SizedBox(height: 10),
-        
+
             // Categories table
             Card(
-              child: SingleChildScrollView(
-                scrollDirection: Axis.vertical,
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-        
-                  child: Column(
-                    children: [
-                      DataTable(
-                        // dataRowMinHeight: 24,
-                        columns: const [
-                          DataColumn(label: Text("No")),
-                          DataColumn(label: Text("Name")),
-                          DataColumn(label: Text("Phone")),
-                          DataColumn(label: Text("Company")),
-                          DataColumn(label: Text("Address")),
-                          DataColumn(label: Text("Action")),
-                        ],
-                        rows: List.generate(
-                          suppliers.isEmpty ? 1 : suppliers.length,
-                          (index) {
-                            if (suppliers.isEmpty) {
-                              return const DataRow(cells: [
-                                DataCell(Text('-')),
-                                DataCell(Text('-')),
-                                DataCell(
-                                    Text('No Supllier match current filters')),
-                                DataCell(Text('-')),
-                                DataCell(Text('-')),
-                                DataCell(Text('-')),
-                              ]);
-                            }
-                  
-                            final supplier = suppliers[index];
-                            return DataRow(cells: [
-                              DataCell(Text('${++index}')),
-                              DataCell(Text('${supplier.name}')),
-                              DataCell(Text('${supplier.phone}')),
-                              DataCell(Text('${supplier.company}')),
-                              DataCell(Text('${supplier.address}')),
-                              DataCell(Row(
-                                children: [
-                                  IconButton(
-                                    onPressed: () {
-                                      _showSupplierDialog(supplier: supplier);
-                                    },
-                                    icon: const Icon(Icons.edit),
-                                    style: IconButton.styleFrom(
-                                      backgroundColor: Colors.yellow,
-                                      shape: const RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.all(Radius.circular(5)),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 5),
-                                  IconButton(
-                                    onPressed: () {
-                                      _confirmDeleteSupplier(supplier);
-                                    },
-                                    icon: const Icon(Icons.delete_forever),
-                                    style: IconButton.styleFrom(
-                                      backgroundColor: Colors.red,
-                                      shape: const RoundedRectangleBorder(
-                                        borderRadius:
-                                            BorderRadius.all(Radius.circular(5)),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              )),
-                            ]);
-                          },
+              child: isLoading
+                  ? const Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : SingleChildScrollView(
+                      scrollDirection: Axis.vertical,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Column(
+                          children: [
+                            DataTable(
+                              columns: const [
+                                DataColumn(label: Text("No")),
+                                DataColumn(label: Text("Name")),
+                                DataColumn(label: Text("Phone")),
+                                DataColumn(label: Text("Company")),
+                                DataColumn(label: Text("Address")),
+                                DataColumn(label: Text("Action")),
+                              ],
+                              rows: List.generate(
+                                suppliers.isEmpty ? 1 : suppliers.length,
+                                (index) {
+                                  if (suppliers.isEmpty) {
+                                    return const DataRow(cells: [
+                                      DataCell(Text('-')),
+                                      DataCell(Text('-')),
+                                      DataCell(Text(
+                                          'No Supllier match current filters')),
+                                      DataCell(Text('-')),
+                                      DataCell(Text('-')),
+                                      DataCell(Text('-')),
+                                    ]);
+                                  }
+
+                                  final supplier = suppliers[index];
+                                  return DataRow(cells: [
+                                    DataCell(Text('${++index}')),
+                                    DataCell(Text('${supplier.name}')),
+                                    DataCell(Text('${supplier.phone}')),
+                                    DataCell(Text('${supplier.company}')),
+                                    DataCell(Text('${supplier.address}')),
+                                    DataCell(Row(
+                                      children: [
+                                        IconButton(
+                                          onPressed: () {
+                                            _showSupplierDialog(
+                                                supplier: supplier);
+                                          },
+                                          icon: const Icon(Icons.edit),
+                                          style: IconButton.styleFrom(
+                                            backgroundColor: Colors.yellow,
+                                            shape: const RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.all(
+                                                  Radius.circular(5)),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 5),
+                                        IconButton(
+                                          onPressed: () {
+                                            _confirmDeleteSupplier(supplier);
+                                          },
+                                          icon:
+                                              const Icon(Icons.delete_forever),
+                                          style: IconButton.styleFrom(
+                                            backgroundColor: Colors.red,
+                                            shape: const RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.all(
+                                                  Radius.circular(5)),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    )),
+                                  ]);
+                                },
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
+                    ),
             )
           ],
         ),

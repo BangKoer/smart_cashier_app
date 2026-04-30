@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
+import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:smart_cashier_app/common/widgets/custom_loading.dart';
 import 'package:smart_cashier_app/constant/global_variables.dart';
@@ -12,6 +13,7 @@ import 'package:smart_cashier_app/models/supplier.dart';
 import 'package:smart_cashier_app/module/report/screens/supplier_screen.dart';
 import 'package:smart_cashier_app/module/report/services/report_services.dart';
 import 'package:smart_cashier_app/module/products/services/products_services.dart';
+import 'package:smart_cashier_app/module/report/viewmodel/report_view_model.dart';
 import 'package:smart_cashier_app/utils/format_rupiah.dart' as format;
 
 class ReportScreen extends StatefulWidget {
@@ -26,104 +28,60 @@ class _ReportScreenState extends State<ReportScreen> {
   final ReportServices _reportServices = ReportServices();
   final ProductServices _productServices = ProductServices();
 
-  bool _isLoading = true;
-  String? _errorMessage;
-  DateTime? _fromDate;
-  DateTime? _toDate;
-  String _paymentStatus = 'all';
-  String _productSortBy = 'sales_desc';
+  // bool _isProductLoading = true;
+  // String? _productError;
+  // DateTime? _productFromDate;
+  // DateTime? _productToDate;
+  // String _productPaymentStatus = 'all';
+  // // int _productLimit = 50;
+  // int _productRowsPerPage = 10;
+  // List<Map<String, dynamic>> _productSales = [];
 
-  Map<String, dynamic> _kpi = {
-    "total_transaction": 0,
-    "total_sales": 0.0,
-    "total_profit": 0.0,
-    "avg_transaction_value": 0.0,
-  };
-  Map<String, dynamic> _series = {
-    "group_by": "day",
-    "points": <Map<String, dynamic>>[],
-  };
-  bool _isCategoryLoading = true;
-  String? _categoryError;
-  DateTime? _categoryFromDate;
-  DateTime? _categoryToDate;
-  String _categoryPaymentStatus = 'all';
-  List<Map<String, dynamic>> _categorySales = [];
+  // bool _isReceiptLoading = true;
+  // String? _receiptError;
+  // List<PurchasedReceipt> _purchasedReceipts = [];
 
-  bool _isProductLoading = true;
-  String? _productError;
-  DateTime? _productFromDate;
-  DateTime? _productToDate;
-  String _productPaymentStatus = 'all';
-  // int _productLimit = 50;
-  int _productRowsPerPage = 10;
-  List<Map<String, dynamic>> _productSales = [];
+  // bool _isSupplierLoading = true;
+  // String? _supplierError;
+  // List<Supplier> _suppliers = [];
 
-  bool _isReceiptLoading = true;
-  String? _receiptError;
-  List<PurchasedReceipt> _purchasedReceipts = [];
-
-  bool _isSupplierLoading = true;
-  String? _supplierError;
-  List<Supplier> _suppliers = [];
-
-  bool _isProductsLoading = true;
-  String? _productsError;
-  List<Product> _products = [];
-
-  Future<void> _loadKpiSummary() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final filtersPayment = _paymentStatus == 'all' ? null : _paymentStatus;
-      final data = await _reportServices.fetchKpiSummary(
-          context: context,
-          dateFrom: _fromDate,
-          dateTo: _toDate,
-          paymentStatus: filtersPayment);
-      final series = await _reportServices.fetchSalesSeries(
-        context: context,
-        dateFrom: _fromDate,
-        dateTo: _toDate,
-        paymentStatus: filtersPayment,
-      );
-      if (!mounted) return;
-      setState(() {
-        _kpi = data;
-        _series = series;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = e.toString();
-      });
-    } finally {
-      if (!mounted) return;
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
+  // bool _isProductsLoading = true;
+  // String? _productsError;
+  // List<Product> _products = [];
 
   @override
   void initState() {
     super.initState();
-    _loadKpiSummary();
-    _loadCategorySales();
-    _loadProductSales();
-    _loadPurchasedReceipts();
-    _loadSuppliers();
-    _loadProducts();
+    Future.microtask(
+      () {
+        context.read<ReportViewModel>().loadKpiSummary(context);
+        context.read<ReportViewModel>().loadCategorySales(context);
+        context.read<ReportViewModel>().loadProductSales(context);
+        context.read<ReportViewModel>().loadPurchasedReceipts(context);
+        context.read<ReportViewModel>().loadSuppliers(context);
+        context.read<ReportViewModel>().loadProducts(context);
+      },
+    );
+
+    // _loadCategorySales();
+    // _loadProductSales();
+    // _loadPurchasedReceipts();
+    // _loadSuppliers();
+    // _loadProducts();
   }
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.read<ReportViewModel>();
+    final vmW = context.watch<ReportViewModel>();
     return Scaffold(
       body: RefreshIndicator(
-        onRefresh: _loadKpiSummary,
+        onRefresh: () async {
+          await vm.loadKpiSummary(context);
+          await vm.loadCategorySales(context);
+          await vm.loadProductSales(context);
+          await vm.loadPurchasedReceipts(context);
+        },
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
@@ -139,18 +97,18 @@ class _ReportScreenState extends State<ReportScreen> {
             const SizedBox(height: 16),
             _buildFilterSection(),
             const SizedBox(height: 16),
-            if (_isLoading)
+            if (vmW.isLoading)
               const SizedBox(
                 height: 220,
                 child: Center(
                   child: CustomLoading(),
                 ),
               )
-            else if (_errorMessage != null)
+            else if (vmW.errorMessage != null)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 20),
                 child: Text(
-                  _errorMessage!,
+                  vmW.errorMessage!,
                   style: const TextStyle(color: Colors.red),
                 ),
               )
@@ -158,11 +116,11 @@ class _ReportScreenState extends State<ReportScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildKpiSection(),
+                  _buildKpiSection(), // ✅
                   const SizedBox(height: 20),
-                  _buildSalesSeriesSection(),
+                  _buildSalesSeriesSection(), // ✅
                   const SizedBox(height: 20),
-                  _buildCategoryAndProductRow(),
+                  _buildCategoryAndProductRow(), // ✅
                   const SizedBox(height: 20),
                   _buildPurchasedReceiptsSection(),
                 ],
@@ -174,12 +132,8 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Widget _buildFilterSection() {
-    final DateTime? localFromDate = _fromDate;
-    final DateTime? localToDate = _toDate;
-    final fromDateText =
-        localFromDate == null ? 'From Date' : _formatDate(localFromDate);
-    final toDateText =
-        localToDate == null ? 'To Date' : _formatDate(localToDate);
+    var vm = context.read<ReportViewModel>();
+    var vmW = context.watch<ReportViewModel>();
 
     return Card(
       elevation: 2,
@@ -194,7 +148,9 @@ class _ReportScreenState extends State<ReportScreen> {
             OutlinedButton.icon(
               onPressed: _pickFromDate,
               icon: const Icon(Icons.date_range),
-              label: Text(fromDateText),
+              label: Text(vmW.fromDate == null
+                  ? 'From Date'
+                  : vm.formatDate(vmW.fromDate!)),
               style: ElevatedButton.styleFrom(
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(5)),
@@ -205,7 +161,8 @@ class _ReportScreenState extends State<ReportScreen> {
             OutlinedButton.icon(
               onPressed: _pickToDate,
               icon: const Icon(Icons.event),
-              label: Text(toDateText),
+              label: Text(
+                  vmW.toDate == null ? 'To Date' : vm.formatDate(vmW.toDate!)),
               style: ElevatedButton.styleFrom(
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(5)),
@@ -216,7 +173,7 @@ class _ReportScreenState extends State<ReportScreen> {
             SizedBox(
               width: 180,
               child: DropdownButtonFormField<String>(
-                value: _paymentStatus,
+                value: vm.paymentStatus,
                 decoration: const InputDecoration(
                   labelText: "Payment Status",
                   border: OutlineInputBorder(),
@@ -228,19 +185,27 @@ class _ReportScreenState extends State<ReportScreen> {
                   DropdownMenuItem(value: 'pending', child: Text('Pending')),
                 ],
                 onChanged: (value) {
-                  setState(() {
-                    _paymentStatus = value ?? 'all';
-                  });
+                  vm.setPaymentStatus(status: value!);
                 },
               ),
             ),
             ElevatedButton.icon(
-              onPressed: _applyFilters,
+              onPressed: () async {
+                if (!vm.applyFilters()) {
+                  showSnackBar(
+                    context,
+                    "From Date cannot be after To Date",
+                    bgColor: Colors.red,
+                  );
+                } else {
+                  await vm.loadKpiSummary(context);
+                }
+              },
               icon: const Icon(Icons.filter_alt),
               label: const Text("Apply"),
             ),
             OutlinedButton.icon(
-              onPressed: _resetFilters,
+              onPressed: () => vm.resetFilters(context),
               icon: const Icon(Icons.restart_alt),
               label: const Text("Reset"),
             ),
@@ -252,196 +217,80 @@ class _ReportScreenState extends State<ReportScreen> {
 
   Future<void> _pickFromDate() async {
     final now = DateTime.now();
+    final vm = context.read<ReportViewModel>();
     final picked = await showDatePicker(
       context: context,
-      initialDate: _fromDate ?? now,
+      initialDate: vm.fromDate ?? now,
       firstDate: DateTime(2020, 1, 1),
       lastDate: DateTime(now.year + 5, 12, 31),
     );
 
     if (picked == null) return;
-    setState(() {
-      _fromDate = picked;
-    });
+
+    vm.setFromDate(picked);
   }
 
   Future<void> _pickToDate() async {
     final now = DateTime.now();
+    final vm = context.read<ReportViewModel>();
     final picked = await showDatePicker(
       context: context,
-      initialDate: _toDate ?? _fromDate ?? now,
+      initialDate: vm.toDate ?? vm.fromDate ?? now,
       firstDate: DateTime(2020, 1, 1),
       lastDate: DateTime(now.year + 5, 12, 31),
     );
 
     if (picked == null) return;
-    setState(() {
-      _toDate = picked;
-    });
+    vm.setToDate(picked);
   }
 
-  Future<void> _applyFilters() async {
-    final DateTime? localFromDate = _fromDate;
-    final DateTime? localToDate = _toDate;
+  // Future<void> _loadSuppliers() async {
+  //   setState(() {
+  //     _isSupplierLoading = true;
+  //     _supplierError = null;
+  //   });
+  //   try {
+  //     final data = await _reportServices.fetchSuppliers(context: context);
+  //     if (!mounted) return;
+  //     setState(() {
+  //       _suppliers = data;
+  //     });
+  //   } catch (e) {
+  //     if (!mounted) return;
+  //     setState(() {
+  //       _supplierError = e.toString();
+  //     });
+  //   } finally {
+  //     if (!mounted) return;
+  //     setState(() {
+  //       _isSupplierLoading = false;
+  //     });
+  //   }
+  // }
 
-    if (localFromDate != null &&
-        localToDate != null &&
-        localFromDate.isAfter(localToDate)) {
-      if (!mounted) return;
-      showSnackBar(
-        context,
-        "From Date cannot be after To Date",
-        bgColor: Colors.red,
-      );
-      return;
-    }
-    await _loadKpiSummary();
-  }
-
-  Future<void> _resetFilters() async {
-    setState(() {
-      _fromDate = null;
-      _toDate = null;
-      _paymentStatus = 'all';
-    });
-    await _loadKpiSummary();
-  }
-
-  Future<void> _loadCategorySales() async {
-    setState(() {
-      _isCategoryLoading = true;
-      _categoryError = null;
-    });
-    try {
-      final data = await _reportServices.fetchCategorySales(
-        context: context,
-        dateFrom: _categoryFromDate,
-        dateTo: _categoryToDate,
-        paymentStatus:
-            _categoryPaymentStatus == 'all' ? null : _categoryPaymentStatus,
-      );
-      if (!mounted) return;
-      setState(() {
-        _categorySales = data;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _categoryError = e.toString();
-      });
-    } finally {
-      if (!mounted) return;
-      setState(() {
-        _isCategoryLoading = false;
-      });
-    }
-  }
-
-  Future<void> _loadProductSales() async {
-    setState(() {
-      _isProductLoading = true;
-      _productError = null;
-    });
-    try {
-      final data = await _reportServices.fetchProductSales(
-        context: context,
-        // dateFrom: _productFromDate,
-        // dateTo: _productToDate,
-        paymentStatus:
-            _productPaymentStatus == 'all' ? null : _productPaymentStatus,
-        // limit: _productLimit,
-        sortBy: _productSortBy,
-      );
-      if (!mounted) return;
-      setState(() {
-        _productSales = data;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _productError = e.toString();
-      });
-    } finally {
-      if (!mounted) return;
-      setState(() {
-        _isProductLoading = false;
-      });
-    }
-  }
-
-  Future<void> _loadPurchasedReceipts() async {
-    setState(() {
-      _isReceiptLoading = true;
-      _receiptError = null;
-    });
-    try {
-      final data = await _reportServices.fetchPurchasedReceipts(
-        context: context,
-      );
-      if (!mounted) return;
-      setState(() {
-        _purchasedReceipts = data;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _receiptError = e.toString();
-      });
-    } finally {
-      if (!mounted) return;
-      setState(() {
-        _isReceiptLoading = false;
-      });
-    }
-  }
-
-  Future<void> _loadSuppliers() async {
-    setState(() {
-      _isSupplierLoading = true;
-      _supplierError = null;
-    });
-    try {
-      final data = await _reportServices.fetchSuppliers(context: context);
-      if (!mounted) return;
-      setState(() {
-        _suppliers = data;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _supplierError = e.toString();
-      });
-    } finally {
-      if (!mounted) return;
-      setState(() {
-        _isSupplierLoading = false;
-      });
-    }
-  }
-
-  Future<void> _loadProducts() async {
-    setState(() {
-      _isProductsLoading = true;
-      _productsError = null;
-    });
-    try {
-      final data = await _productServices.fetchAllProducts(context: context);
-      if (!mounted) return;
-      setState(() {
-        _products = data;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _productsError = e.toString();
-      });
-    } finally {
-      if (!mounted) return;
-      setState(() {
-        _isProductsLoading = false;
-      });
-    }
-  }
+  // Future<void> _loadProducts() async {
+  //   setState(() {
+  //     _isProductsLoading = true;
+  //     _productsError = null;
+  //   });
+  //   try {
+  //     final data = await _productServices.fetchAllProducts(context: context);
+  //     if (!mounted) return;
+  //     setState(() {
+  //       _products = data;
+  //     });
+  //   } catch (e) {
+  //     if (!mounted) return;
+  //     setState(() {
+  //       _productsError = e.toString();
+  //     });
+  //   } finally {
+  //     if (!mounted) return;
+  //     setState(() {
+  //       _isProductsLoading = false;
+  //     });
+  //   }
+  // }
 
   String _formatDate(DateTime date) {
     final year = date.year.toString().padLeft(4, '0');
@@ -452,6 +301,7 @@ class _ReportScreenState extends State<ReportScreen> {
 
   Widget _buildKpiSection() {
     const spacing = 12.0;
+    final vm = context.watch<ReportViewModel>();
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 980;
@@ -463,7 +313,7 @@ class _ReportScreenState extends State<ReportScreen> {
                 width: cardWidth,
                 child: _buildKpiCard(
                   title: "Total Transaction",
-                  value: (_kpi["total_transaction"] ?? 0).toString(),
+                  value: (vm.kpi["total_transaction"] ?? 0).toString(),
                   color: Colors.blue,
                 ),
               ),
@@ -472,7 +322,7 @@ class _ReportScreenState extends State<ReportScreen> {
                 width: cardWidth,
                 child: _buildKpiCard(
                   title: "Total Sales",
-                  value: format.toRupiah(_kpi["total_sales"] ?? 0),
+                  value: format.toRupiah(vm.kpi["total_sales"] ?? 0),
                   color: Colors.green,
                 ),
               ),
@@ -481,7 +331,7 @@ class _ReportScreenState extends State<ReportScreen> {
                 width: cardWidth,
                 child: _buildKpiCard(
                   title: "Total Profit",
-                  value: format.toRupiah(_kpi["total_profit"] ?? 0),
+                  value: format.toRupiah(vm.kpi["total_profit"] ?? 0),
                   color: Colors.orange,
                 ),
               ),
@@ -490,7 +340,7 @@ class _ReportScreenState extends State<ReportScreen> {
                 width: cardWidth,
                 child: _buildKpiCard(
                   title: "ATV",
-                  value: format.toRupiah(_kpi["avg_transaction_value"] ?? 0),
+                  value: format.toRupiah(vm.kpi["avg_transaction_value"] ?? 0),
                   color: Colors.purple,
                 ),
               ),
@@ -504,22 +354,22 @@ class _ReportScreenState extends State<ReportScreen> {
           children: [
             _buildKpiCard(
               title: "Total Transaction",
-              value: (_kpi["total_transaction"] ?? 0).toString(),
+              value: (vm.kpi["total_transaction"] ?? 0).toString(),
               color: Colors.blue,
             ),
             _buildKpiCard(
               title: "Total Sales",
-              value: format.toRupiah(_kpi["total_sales"] ?? 0),
+              value: format.toRupiah(vm.kpi["total_sales"] ?? 0),
               color: Colors.green,
             ),
             _buildKpiCard(
               title: "Total Profit",
-              value: format.toRupiah(_kpi["total_profit"] ?? 0),
+              value: format.toRupiah(vm.kpi["total_profit"] ?? 0),
               color: Colors.orange,
             ),
             _buildKpiCard(
               title: "ATV",
-              value: format.toRupiah(_kpi["avg_transaction_value"] ?? 0),
+              value: format.toRupiah(vm.kpi["avg_transaction_value"] ?? 0),
               color: Colors.purple,
             ),
           ],
@@ -567,7 +417,8 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Widget _buildSalesSeriesSection() {
-    final pointsRaw = (_series["points"] as List?) ?? const [];
+    var vmW = context.watch<ReportViewModel>();
+    final pointsRaw = (vmW.series["points"] as List?) ?? const [];
     final points =
         pointsRaw.whereType<Map<String, dynamic>>().toList(growable: false);
 
@@ -585,7 +436,7 @@ class _ReportScreenState extends State<ReportScreen> {
             ),
             const SizedBox(height: 6),
             Text(
-              "Grouping: ${(_series["group_by"] ?? "day").toString()}",
+              "Grouping: ${(vmW.series["group_by"] ?? "day").toString()}",
               style: const TextStyle(color: Colors.black54),
             ),
             const SizedBox(height: 14),
@@ -650,10 +501,14 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Widget _buildCategorySalesCard({required bool isTight}) {
-    final fromText =
-        _categoryFromDate == null ? 'From' : _formatDate(_categoryFromDate!);
-    final toText =
-        _categoryToDate == null ? 'To' : _formatDate(_categoryToDate!);
+    final vmW = context.watch<ReportViewModel>();
+    final vm = context.read<ReportViewModel>();
+    final fromText = vmW.categoryFromDate == null
+        ? 'From'
+        : _formatDate(vmW.categoryFromDate!);
+    final toText = vmW.categoryFromDate == null
+        ? 'To'
+        : _formatDate(vmW.categoryFromDate!);
 
     return Card(
       elevation: 3,
@@ -693,7 +548,7 @@ class _ReportScreenState extends State<ReportScreen> {
                 SizedBox(
                   width: 160,
                   child: DropdownButtonFormField<String>(
-                    value: _categoryPaymentStatus,
+                    value: vmW.categoryPaymentStatus,
                     decoration: const InputDecoration(
                       labelText: "Payment",
                       border: OutlineInputBorder(),
@@ -706,18 +561,26 @@ class _ReportScreenState extends State<ReportScreen> {
                           value: 'pending', child: Text('Pending')),
                     ],
                     onChanged: (val) {
-                      setState(() {
-                        _categoryPaymentStatus = val ?? 'all';
-                      });
+                      vm.setCategoryPaymentStatus(status: val!);
                     },
                   ),
                 ),
                 ElevatedButton(
-                  onPressed: _applyCategoryFilters,
+                  onPressed: () async {
+                    if (!vm.applyCategoryFilters()) {
+                      showSnackBar(
+                        context,
+                        "From Date cannot be after To Date",
+                        bgColor: Colors.red,
+                      );
+                    } else {
+                      await vm.loadCategorySales(context);
+                    }
+                  },
                   child: const Text("Apply"),
                 ),
                 OutlinedButton(
-                  onPressed: _resetCategoryFilters,
+                  onPressed: () => vm.resetCategoryFilters(context),
                   child: const Text("Reset"),
                 ),
               ],
@@ -737,11 +600,7 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Widget _buildProductSalesCard({required bool isTight}) {
-    // final fromText =
-    //     _productFromDate == null ? 'From' : _formatDate(_productFromDate!);
-    // final toText = _productToDate == null ? 'To' : _formatDate(_productToDate!);
-
-    // final dataSource = _ProductSalesDataSource(_productSales);
+    final vm = context.read<ReportViewModel>();
 
     return Card(
       elevation: 3,
@@ -762,12 +621,10 @@ class _ReportScreenState extends State<ReportScreen> {
               runSpacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                // OutlinedButton(onPressed: _pickProductFromDate, child: Text(fromText)),
-                // OutlinedButton(onPressed: _pickProductToDate, child: Text(toText)),
                 SizedBox(
                   width: 200,
                   child: DropdownButtonFormField(
-                    value: _productSortBy,
+                    value: vm.productSortBy,
                     decoration: const InputDecoration(
                       labelText: "Sort By",
                       border: OutlineInputBorder(),
@@ -784,16 +641,14 @@ class _ReportScreenState extends State<ReportScreen> {
                           value: 'sales_asc', child: Text("Sales Low-High")),
                     ],
                     onChanged: (value) {
-                      setState(() {
-                        _productSortBy = value ?? 'sales_desc';
-                      });
+                      vm.setProductSortBy(sort: value!);
                     },
                   ),
                 ),
                 SizedBox(
                   width: 160,
                   child: DropdownButtonFormField<String>(
-                    value: _productPaymentStatus,
+                    value: vm.productPaymentStatus,
                     decoration: const InputDecoration(
                       labelText: "Payment",
                       border: OutlineInputBorder(),
@@ -805,41 +660,24 @@ class _ReportScreenState extends State<ReportScreen> {
                       DropdownMenuItem(
                           value: 'pending', child: Text('Pending')),
                     ],
-                    onChanged: (val) {
-                      setState(() {
-                        _productPaymentStatus = val ?? 'all';
-                      });
-                    },
+                    onChanged: (val) =>
+                        vm.setProductPaymentStatus(status: val!),
                   ),
                 ),
-                // SizedBox(
-                //   width: 120,
-                //   child: DropdownButtonFormField<int>(
-                //     value: _productLimit,
-                //     decoration: const InputDecoration(
-                //       labelText: "Limit",
-                //       border: OutlineInputBorder(),
-                //       isDense: true,
-                //     ),
-                //     items: const [
-                //       DropdownMenuItem(value: 10, child: Text('10')),
-                //       DropdownMenuItem(value: 20, child: Text('20')),
-                //       DropdownMenuItem(value: 50, child: Text('50')),
-                //       DropdownMenuItem(value: 100, child: Text('100')),
-                //     ],
-                //     onChanged: (val) {
-                //       setState(() {
-                //         _productLimit = val ?? 20;
-                //       });
-                //     },
-                //   ),
-                // ),
                 ElevatedButton(
-                  onPressed: _applyProductFilters,
+                  onPressed: () async {
+                    if (!vm.applyProductFilters()) {
+                      showSnackBar(context, "From Date cannot be after To Date",
+                          bgColor: Colors.red);
+                      return;
+                    } else {
+                      await vm.loadProductSales(context);
+                    }
+                  },
                   child: const Text("Apply"),
                 ),
                 OutlinedButton(
-                  onPressed: _resetProductFilters,
+                  onPressed: () => vm.resetProductFilters(context),
                   child: const Text("Reset"),
                 ),
               ],
@@ -859,37 +697,42 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Widget _buildCategoryChartBody() {
-    if (_isCategoryLoading) {
+    final vmW = context.watch<ReportViewModel>();
+    if (vmW.isCategoryLoading) {
       return const Center(child: CustomLoading());
     }
-    if (_categoryError != null) {
+    if (vmW.categoryError != null) {
       return Center(
-        child: Text(_categoryError!, style: const TextStyle(color: Colors.red)),
+        child:
+            Text(vmW.categoryError!, style: const TextStyle(color: Colors.red)),
       );
     }
-    if (_categorySales.isEmpty) {
+    if (vmW.categorySales.isEmpty) {
       return const Center(child: Text("No category data"));
     }
     return LayoutBuilder(
       builder: (context, constraints) {
         return CustomPaint(
           size: Size(constraints.maxWidth, constraints.maxHeight),
-          painter: _CategoryBarChartPainter(data: _categorySales),
+          painter: _CategoryBarChartPainter(data: vmW.categorySales),
         );
       },
     );
   }
 
   Widget _buildProductTableBody() {
-    if (_isProductLoading) {
+    var vmW = context.watch<ReportViewModel>();
+    var vm = context.read<ReportViewModel>();
+    if (vmW.isProductLoading) {
       return const Center(child: CustomLoading());
     }
-    if (_productError != null) {
+    if (vmW.productError != null) {
       return Center(
-        child: Text(_productError!, style: const TextStyle(color: Colors.red)),
+        child:
+            Text(vmW.productError!, style: const TextStyle(color: Colors.red)),
       );
     }
-    if (_productSales.isEmpty) {
+    if (vmW.productSales.isEmpty) {
       return const Center(child: Text("No product data"));
     }
     return LayoutBuilder(
@@ -909,7 +752,7 @@ class _ReportScreenState extends State<ReportScreen> {
         final maxRows =
             availableHeight > 0 ? (availableHeight / dataRowHeight).floor() : 1;
         final effectiveRowsPerPage =
-            _productRowsPerPage.clamp(1, maxRows == 0 ? 1 : maxRows);
+            vmW.productRowsPerPage.clamp(1, maxRows == 0 ? 1 : maxRows);
         final availableRows = <int>{
           5,
           10,
@@ -941,17 +784,14 @@ class _ReportScreenState extends State<ReportScreen> {
             ),
           ],
           source: _ProductSalesDataSource(
-            _productSales,
+            vmW.productSales,
             nameColWidth: nameColWidth,
             salesColWidth: salesColWidth,
           ),
           rowsPerPage: effectiveRowsPerPage,
           availableRowsPerPage: availableRows,
           onRowsPerPageChanged: (value) {
-            if (value == null) return;
-            setState(() {
-              _productRowsPerPage = value;
-            });
+            value != null ? vm.setProductRowPerPage(value) : null;
           },
         );
       },
@@ -959,103 +799,29 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Future<void> _pickCategoryFromDate() async {
+    final vm = context.read<ReportViewModel>();
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
-      initialDate: _categoryFromDate ?? now,
+      initialDate: vm.categoryFromDate ?? now,
       firstDate: DateTime(2020, 1, 1),
       lastDate: DateTime(now.year + 5, 12, 31),
     );
     if (picked == null) return;
-    setState(() {
-      _categoryFromDate = picked;
-    });
+    vm.setCategoryFromDate(picked);
   }
 
   Future<void> _pickCategoryToDate() async {
+    final vm = context.read<ReportViewModel>();
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
-      initialDate: _categoryToDate ?? _categoryFromDate ?? now,
+      initialDate: vm.categoryToDate ?? vm.categoryFromDate ?? now,
       firstDate: DateTime(2020, 1, 1),
       lastDate: DateTime(now.year + 5, 12, 31),
     );
     if (picked == null) return;
-    setState(() {
-      _categoryToDate = picked;
-    });
-  }
-
-  Future<void> _applyCategoryFilters() async {
-    final from = _categoryFromDate;
-    final to = _categoryToDate;
-    if (from != null && to != null && from.isAfter(to)) {
-      if (!mounted) return;
-      showSnackBar(context, "From Date cannot be after To Date",
-          bgColor: Colors.red);
-      return;
-    }
-    await _loadCategorySales();
-  }
-
-  Future<void> _resetCategoryFilters() async {
-    setState(() {
-      _categoryFromDate = null;
-      _categoryToDate = null;
-      _categoryPaymentStatus = 'all';
-    });
-    await _loadCategorySales();
-  }
-
-  // Future<void> _pickProductFromDate() async {
-  //   final now = DateTime.now();
-  //   final picked = await showDatePicker(
-  //     context: context,
-  //     initialDate: _productFromDate ?? now,
-  //     firstDate: DateTime(2020, 1, 1),
-  //     lastDate: DateTime(now.year + 5, 12, 31),
-  //   );
-  //   if (picked == null) return;
-  //   setState(() {
-  //     _productFromDate = picked;
-  //   });
-  // }
-
-  // Future<void> _pickProductToDate() async {
-  //   final now = DateTime.now();
-  //   final picked = await showDatePicker(
-  //     context: context,
-  //     initialDate: _productToDate ?? _productFromDate ?? now,
-  //     firstDate: DateTime(2020, 1, 1),
-  //     lastDate: DateTime(now.year + 5, 12, 31),
-  //   );
-  //   if (picked == null) return;
-  //   setState(() {
-  //     _productToDate = picked;
-  //   });
-  // }
-
-  Future<void> _applyProductFilters() async {
-    final from = _productFromDate;
-    final to = _productToDate;
-    if (from != null && to != null && from.isAfter(to)) {
-      if (!mounted) return;
-      showSnackBar(context, "From Date cannot be after To Date",
-          bgColor: Colors.red);
-      return;
-    }
-    await _loadProductSales();
-  }
-
-  Future<void> _resetProductFilters() async {
-    setState(() {
-      _productFromDate = null;
-      _productToDate = null;
-      _productPaymentStatus = 'all';
-      // _productLimit = 50;
-      _productSortBy = 'sales_desc';
-    });
-    await _loadProductSales();
+    vm.setCategoryToDate(picked);
   }
 
   Widget _buildPurchasedReceiptsSection() {
@@ -1094,7 +860,10 @@ class _ReportScreenState extends State<ReportScreen> {
                       Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => SupplierScreen(),
+                            builder: (context) => ChangeNotifierProvider(
+                              create: (_)=>ReportViewModel(ReportServices(), ProductServices()),
+                              child: SupplierScreen(),
+                            ),
                           ));
                     },
                     icon: const Icon(Icons.person),
@@ -1116,16 +885,19 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   Widget _buildPurchasedReceiptsTable() {
-    if (_isReceiptLoading) {
+    final vm = context.read<ReportViewModel>();
+    final vmW = context.watch<ReportViewModel>();
+    if (vmW.isReceiptLoading) {
       return const SizedBox(
         height: 160,
         child: Center(child: CustomLoading()),
       );
     }
-    if (_receiptError != null) {
+    if (vmW.receiptError != null) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Text(_receiptError!, style: const TextStyle(color: Colors.red)),
+        child:
+            Text(vmW.receiptError!, style: const TextStyle(color: Colors.red)),
       );
     }
     return LayoutBuilder(
@@ -1154,9 +926,11 @@ class _ReportScreenState extends State<ReportScreen> {
                     DataColumn(label: Text("Action")),
                   ],
                   rows: List.generate(
-                    _purchasedReceipts.isEmpty ? 1 : _purchasedReceipts.length,
+                    vmW.purchasedReceipts.isEmpty
+                        ? 1
+                        : vmW.purchasedReceipts.length,
                     (index) {
-                      if (_purchasedReceipts.isEmpty) {
+                      if (vmW.purchasedReceipts.isEmpty) {
                         return const DataRow(
                           cells: [
                             DataCell(Text('-')),
@@ -1170,7 +944,7 @@ class _ReportScreenState extends State<ReportScreen> {
                         );
                       }
 
-                      final item = _purchasedReceipts[index];
+                      final item = vmW.purchasedReceipts[index];
                       final supplierName =
                           item.supplier?.name.isNotEmpty == true
                               ? item.supplier!.name
@@ -1197,8 +971,10 @@ class _ReportScreenState extends State<ReportScreen> {
                             Row(
                               children: [
                                 IconButton(
-                                  onPressed: () {
-                                    _showPurchasedReceiptDialog(item.id);
+                                  onPressed: () async {
+                                    await vm.loadDetailPurchasedReceipt(
+                                        context, item.id);
+                                    _showPurchasedReceiptDialog();
                                   },
                                   icon: const Icon(Icons.visibility),
                                   style: IconButton.styleFrom(
@@ -1227,8 +1003,10 @@ class _ReportScreenState extends State<ReportScreen> {
                                 ),
                                 const SizedBox(width: 6),
                                 IconButton(
-                                  onPressed: () {
-                                    _updateInvoice(item.id);
+                                  onPressed: () async {
+                                    await vm.loadDetailPurchasedReceipt(
+                                        context, item.id);
+                                    _updateInvoice();
                                   },
                                   icon: const Icon(Icons.edit),
                                   style: IconButton.styleFrom(
@@ -1271,254 +1049,202 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
-  Future<void> _updateInvoice(int receiptId) async {
-    PurchasedReceipt? detail;
-    bool isLoading = true;
-    bool isSubmitting = false;
-    String? error;
-
+  Future<void> _updateInvoice() async {
+    final vm = context.read<ReportViewModel>();
+    vm.initEditingReceiptDateFromDetail();
+    final receipt = vm.detail;
     final receiptNoCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
-    DateTime? receiptDate;
+    // DateTime? receiptDate;
 
     final qtyCtrls = <TextEditingController>[];
     final unitCtrls = <TextEditingController>[];
 
     if (!mounted) return;
+    receiptNoCtrl.text = receipt!.receiptNo;
+    noteCtrl.text = receipt.note ?? '';
+    // receiptDate = DateTime.parse(vm.detail!.receiptDate);
 
-    await showDialog(
+    for (final item in receipt.items) {
+      qtyCtrls.add(TextEditingController(text: item.qty.toString()));
+      unitCtrls.add(TextEditingController(text: item.unitCost.toString()));
+    }
+
+    await showDialog<bool>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          Future<void> loadDetail() async {
-            try {
-              final data = await _reportServices.fetchPurchasedReceiptDetail(
-                context: context,
-                id: receiptId,
-              );
-
-              if (!mounted) return;
-
-              detail = data;
-              receiptNoCtrl.text = data?.receiptNo ?? '';
-              noteCtrl.text = data?.note ?? '';
-              receiptDate = DateTime.parse(data?.receiptDate ?? '');
-
-              qtyCtrls.clear();
-              unitCtrls.clear();
-
-              for (final item in data?.items ?? []) {
-                qtyCtrls.add(TextEditingController(text: item.qty.toString()));
-                // debugPrint("unit cost : ${item.unitCost}");
-                unitCtrls
-                    .add(TextEditingController(text: item.unitCost.toString()));
-              }
-
-              setDialogState(() => isLoading = false);
-            } catch (e) {
-              setDialogState(() {
-                error = e.toString();
-                isLoading = false;
-              });
-            }
-          }
-
-          if (isLoading && detail == null && error == null) {
-            loadDetail();
-            // debugPrint("is control unit empty: ${unitCtrls.isEmpty.toString()}");
-          }
-
-          Future<void> submit() async {
-            if (detail == null) return;
-
-            final itemsPayload = <Map<String, dynamic>>[];
-            for (var i = 0; i < detail!.items.length; i++) {
-              final qty = double.tryParse(qtyCtrls[i].text.trim()) ?? 0;
-              final unit = double.tryParse(unitCtrls[i].text.trim()) ?? 0;
-              // debugPrint("unit value in itemspayload[] : ${unit}");
-
-              if (qty <= 0 || unit < 0) {
-                showSnackBar(context, "Qty/unit_cost invalid",
-                    bgColor: Colors.red);
-                return;
-              }
-
-              final item = detail!.items[i];
-              itemsPayload.add({
-                "id_product": item.idProduct,
-                "id_product_unit": item.idProductUnit,
-                "qty": qty,
-                "unit_cost": unit,
-              });
-            }
-
-            setDialogState(() => isSubmitting = true);
-
-            final ok = await _reportServices.updatePurchasedReceipt(
-              context: context,
-              id: detail!.id,
-              payload: {
-                "id_supplier": detail!.idSupplier,
-                "receipt_no": receiptNoCtrl.text.trim(),
-                "receipt_date": receiptDate?.toIso8601String().substring(0, 10),
-                "note": noteCtrl.text.trim(),
-                "items": itemsPayload,
-              },
-            );
-
-            setDialogState(() => isSubmitting = false);
-
-            if (ok) {
-              Navigator.pop(context);
-              await _loadPurchasedReceipts();
-              showSnackBar(context, "Receipt Updated", bgColor: Colors.green);
-            }
-          }
-
-          return AlertDialog(
-            insetPadding: const EdgeInsets.all(20),
-            backgroundColor: GlobalVariables.backgroundColor,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            title: const Text("Update Receipt"),
-            content: SizedBox(
-              width: MediaQuery.of(context).size.width * 0.7,
-              height: MediaQuery.of(context).size.height * 0.7,
-              child: isLoading
-                  ? const Center(child: CustomLoading())
-                  : error != null
-                      ? Center(
-                          child: Text(error!,
-                              style: const TextStyle(color: Colors.red)))
-                      : detail == null
-                          ? const Center(child: Text("No detail found"))
-                          : SingleChildScrollView(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  TextField(
-                                    controller: receiptNoCtrl,
-                                    decoration: const InputDecoration(
-                                      labelText: "Receipt No",
-                                      border: OutlineInputBorder(),
+      builder: (context) => ChangeNotifierProvider.value(
+        value: vm,
+        child: StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              insetPadding: const EdgeInsets.all(20),
+              backgroundColor: GlobalVariables.backgroundColor,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              title: const Text("Update Receipt"),
+              content: SizedBox(
+                width: MediaQuery.of(context).size.width * 0.7,
+                height: MediaQuery.of(context).size.height * 0.7,
+                child: vm.isDetailLoading
+                    ? const Center(child: CustomLoading())
+                    : vm.detailError != null
+                        ? Center(
+                            child: Text(vm.detailError!,
+                                style: const TextStyle(color: Colors.red)))
+                        : SingleChildScrollView(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                TextField(
+                                  controller: receiptNoCtrl,
+                                  decoration: const InputDecoration(
+                                    labelText: "Receipt No",
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                OutlinedButton.icon(
+                                  onPressed: () async {
+                                    final now = DateTime.now();
+                                    final picked = await showDatePicker(
+                                        context: context,
+                                        initialDate:
+                                            vm.editingReceiptDate ?? now,
+                                        firstDate: DateTime(2020, 1, 1),
+                                        lastDate:
+                                            DateTime(now.year + 5, 12, 31));
+                                    if (picked != null) {
+                                      vm.setEditingReceiptDate(picked);
+                                    }
+                                  },
+                                  icon: const Icon(Icons.date_range),
+                                  label: Consumer<ReportViewModel>(
+                                    builder: (_, vmDate, __) => Text(
+                                      vmDate.editingReceiptDate == null
+                                          ? "Pick Date"
+                                          : DateFormat('yyyy-MM-dd').format(
+                                              vmDate.editingReceiptDate!,
+                                            ),
                                     ),
                                   ),
-                                  const SizedBox(height: 10),
-                                  OutlinedButton.icon(
-                                    onPressed: () async {
-                                      final now = DateTime.now();
-                                      final picked = await showDatePicker(
-                                          context: context,
-                                          initialDate: receiptDate ?? now,
-                                          firstDate: DateTime(2020, 1, 1),
-                                          lastDate:
-                                              DateTime(now.year + 5, 12, 31));
-                                      if (picked != null) {
-                                        setDialogState(
-                                            () => receiptDate = picked);
-                                      }
-                                    },
-                                    icon: const Icon(Icons.date_range),
-                                    label: Text(receiptDate == null
-                                        ? "Pick Date"
-                                        : DateFormat('yyyy-mm-dd')
-                                            .format(receiptDate!)),
+                                ),
+                                const SizedBox(height: 10),
+                                TextField(
+                                  controller: noteCtrl,
+                                  maxLines: 2,
+                                  decoration: const InputDecoration(
+                                    labelText: "Note",
+                                    border: OutlineInputBorder(),
                                   ),
-                                  const SizedBox(height: 10),
-                                  TextField(
-                                    controller: noteCtrl,
-                                    maxLines: 2,
-                                    decoration: const InputDecoration(
-                                      labelText: "Note",
-                                      border: OutlineInputBorder(),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  const Text(
-                                    "Items",
-                                    style:
-                                        TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  ListView.builder(
-                                    shrinkWrap: true,
-                                    physics:
-                                        const NeverScrollableScrollPhysics(),
-                                    itemCount: detail!.items.length,
-                                    itemBuilder: (context, index) {
-                                      final item = detail!.items[index];
-                                      return Padding(
-                                        padding:
-                                            const EdgeInsets.only(bottom: 8),
-                                        child: Row(
-                                          children: [
-                                            Expanded(
-                                              flex: 3,
-                                              child: Text(item.productName ??
-                                                  "Product ${item.idProduct}"),
-                                            ),
-                                            const SizedBox(
-                                              width: 8,
-                                            ),
-                                            Expanded(
-                                              flex: 2,
-                                              child: TextField(
-                                                controller: qtyCtrls[index],
-                                                keyboardType:
-                                                    TextInputType.number,
-                                                decoration:
-                                                    const InputDecoration(
-                                                  labelText: "Qty",
-                                                  border: OutlineInputBorder(),
-                                                ),
+                                ),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  "Items",
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 8),
+                                ListView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: receipt.items.length,
+                                  itemBuilder: (context, index) {
+                                    final item = receipt.items[index];
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            flex: 3,
+                                            child: Text(item.productName ??
+                                                "Product ${item.idProduct}"),
+                                          ),
+                                          const SizedBox(
+                                            width: 8,
+                                          ),
+                                          Expanded(
+                                            flex: 2,
+                                            child: TextField(
+                                              controller: qtyCtrls[index],
+                                              keyboardType:
+                                                  TextInputType.number,
+                                              decoration: const InputDecoration(
+                                                labelText: "Qty",
+                                                border: OutlineInputBorder(),
                                               ),
                                             ),
-                                            const SizedBox(
-                                              width: 8,
-                                            ),
-                                            Expanded(
-                                              flex: 2,
-                                              child: TextField(
-                                                controller: unitCtrls[index],
-                                                keyboardType:
-                                                    TextInputType.number,
-                                                decoration:
-                                                    const InputDecoration(
-                                                  labelText: "Unit Cost",
-                                                  border: OutlineInputBorder(),
-                                                ),
+                                          ),
+                                          const SizedBox(
+                                            width: 8,
+                                          ),
+                                          Expanded(
+                                            flex: 2,
+                                            child: TextField(
+                                              controller: unitCtrls[index],
+                                              keyboardType:
+                                                  TextInputType.number,
+                                              decoration: const InputDecoration(
+                                                labelText: "Unit Cost",
+                                                border: OutlineInputBorder(),
                                               ),
-                                            )
-                                          ],
-                                        ),
-                                      );
-                                    },
-                                  )
-                                ],
-                              ),
+                                            ),
+                                          )
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                )
+                              ],
                             ),
-            ),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text("Cancel")),
-              ElevatedButton(
-                onPressed: isSubmitting ? null : submit,
-                child: isSubmitting
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text("Save"),
+                          ),
               ),
-            ],
-          );
-        },
+              actions: [
+                TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("Cancel")),
+                ElevatedButton(
+                  onPressed: () async {
+                    final qtyList = qtyCtrls.map((e) => e.text).toList();
+                    final unitList = unitCtrls.map((e) => e.text).toList();
+                    final result = await vm.submitReceipt(
+                      context,
+                      receiptNoCtrl.text.trim(),
+                      noteCtrl.text.trim(),
+                      // receiptDate!,
+                      qtyList,
+                      unitList,
+                    );
+                    if (result == true) {
+                      showSnackBar(
+                        context,
+                        "Successfully Edited Receipt Data",
+                        bgColor: Colors.green,
+                      );
+                      Navigator.pop(context);
+                    }
+                  },
+                  child: const Text("Save"),
+                ),
+              ],
+            );
+          },
+        ),
       ),
     );
+
+    await Future.delayed(const Duration(milliseconds: 250));
+    for (final controller in qtyCtrls) {
+      controller.dispose();
+    }
+    for (final controller in unitCtrls) {
+      controller.dispose();
+    }
+    receiptNoCtrl.dispose();
+    noteCtrl.dispose();
+    vm.clearEditingReceiptState();
   }
 
   Future<void> _handleUploadInvoice(int receiptId) async {
+    final vm = context.read<ReportViewModel>();
     final result = await FilePicker.platform.pickFiles(
       type: FileType.image,
       allowMultiple: false,
@@ -1534,22 +1260,14 @@ class _ReportScreenState extends State<ReportScreen> {
 
     if (!mounted) return;
     showSnackBar(context, "Uploading invoice...", bgColor: Colors.black87);
-    final uploaded = await _reportServices.uploadPurchasedReceiptFile(
-      context: context,
-      receiptId: receiptId,
-      filePath: filePath,
-    );
+    await vm.uploadFiles(context, receiptId, filePath);
     if (!mounted) return;
-    if (uploaded == null) {
-      showSnackBar(context, "Upload failed", bgColor: Colors.red);
-      return;
-    }
     showSnackBar(context, "Invoice uploaded", bgColor: Colors.green);
-    await _loadPurchasedReceipts();
   }
 
   Future<void> _deleteInvoice(PurchasedReceipt receipt) async {
-    final isConfirmed = await showDialog<bool>(
+    final vm = context.read<ReportViewModel>();
+    await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: GlobalVariables.backgroundColor,
@@ -1567,7 +1285,18 @@ class _ReportScreenState extends State<ReportScreen> {
             child: const Text("Cancel"),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () async {
+              final ok = await vm.deleteReceipt(
+                context,
+                receipt.id,
+              );
+              if (ok) {
+                // await _loadPurchasedReceipts();
+                await vm.loadPurchasedReceipts(context);
+                showSnackBar(context, "Receipt deleted", bgColor: Colors.green);
+              }
+              Navigator.pop(context, true);
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
@@ -1577,137 +1306,33 @@ class _ReportScreenState extends State<ReportScreen> {
         ],
       ),
     );
-
-    if (isConfirmed != true) return;
-
-    final ok = await _reportServices.deletePurchasedReceipt(
-      context: context,
-      id: receipt.id,
-    );
-    if (!mounted) return;
-    if (ok) {
-      await _loadPurchasedReceipts();
-      showSnackBar(context, "Receipt deleted", bgColor: Colors.green);
-    }
   }
 
-  
-
   Future<void> _showAddInvoiceDialog() async {
-    if (_isSupplierLoading || _isProductsLoading) {
+    final vm = context.read<ReportViewModel>();
+    if (vm.isSupplierLoading || vm.isProductsLoading) {
       showSnackBar(context, "Loading data...", bgColor: Colors.black87);
       return;
     }
-    if (_supplierError != null) {
-      showSnackBar(context, _supplierError!, bgColor: Colors.red);
+    if (vm.supplierError != null) {
+      showSnackBar(context, vm.supplierError!, bgColor: Colors.red);
       return;
     }
-    if (_productsError != null) {
-      showSnackBar(context, _productsError!, bgColor: Colors.red);
+    if (vm.productsError != null) {
+      showSnackBar(context, vm.productsError!, bgColor: Colors.red);
       return;
     }
 
-    final receiptNoCtrl = TextEditingController();
-    final noteCtrl = TextEditingController();
-    DateTime? receiptDate;
-    Supplier? selectedSupplier;
-    final items = <_ReceiptItemDraft>[];
-
-    void addItem() {
-      final draft = _ReceiptItemDraft();
-      if (_products.isNotEmpty) {
-        draft.productId = _products.first.id;
-        if (_products.first.units.isNotEmpty) {
-          draft.unitId = _products.first.units.first.id;
-        }
-      }
-      items.add(draft);
-    }
-
-    addItem();
+    var receiptNoCtrl = TextEditingController();
+    var noteCtrl = TextEditingController();
+    vm.prepareAddInvoiceDraft();
 
     await showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          void removeItem(int index) {
-            items[index].dispose();
-            items.removeAt(index);
-            setDialogState(() {});
-          }
-
-          Product? findProduct(int? id) {
-            return _products
-                .where((p) => p.id == id)
-                .cast<Product?>()
-                .firstOrNull;
-          }
-
-          List<ProductUnit> unitsForProduct(int? id) {
-            final product = findProduct(id);
-            return product?.units ?? [];
-          }
-
-          Future<void> submit() async {
-            if (selectedSupplier == null) {
-              showSnackBar(context, "Select supplier", bgColor: Colors.red);
-              return;
-            }
-            if (receiptDate == null) {
-              showSnackBar(context, "Select receipt date", bgColor: Colors.red);
-              return;
-            }
-            if (items.isEmpty) {
-              showSnackBar(context, "Add at least one item",
-                  bgColor: Colors.red);
-              return;
-            }
-
-            final payloadItems = <Map<String, dynamic>>[];
-            for (final item in items) {
-              final qty = double.tryParse(item.qtyCtrl.text.trim()) ?? 0;
-              final unitCost =
-                  double.tryParse(item.unitCostCtrl.text.trim()) ?? 0;
-              if (item.productId == null ||
-                  item.unitId == null ||
-                  qty <= 0 ||
-                  unitCost < 0) {
-                showSnackBar(context, "Invalid item values",
-                    bgColor: Colors.red);
-                return;
-              }
-              payloadItems.add({
-                "id_product": item.productId,
-                "id_product_unit": item.unitId,
-                "qty": qty,
-                "unit_cost": unitCost,
-              });
-            }
-
-            final result = await _reportServices.createPurchasedReceipt(
-              context: context,
-              payload: {
-                "id_supplier": selectedSupplier!.id,
-                "receipt_no": receiptNoCtrl.text.trim(),
-                "receipt_date": DateFormat('yyyy-MM-dd').format(receiptDate!),
-                "note": noteCtrl.text.trim(),
-                "items": payloadItems,
-              },
-            );
-
-            if (result == null) {
-              showSnackBar(context, "Failed to create receipt",
-                  bgColor: Colors.red);
-              return;
-            }
-
-            if (!mounted) return;
-            Navigator.pop(context);
-            await _loadPurchasedReceipts();
-            showSnackBar(context, "Receipt created", bgColor: Colors.green);
-          }
-
-          return AlertDialog(
+      builder: (context) => ChangeNotifierProvider.value(
+        value: vm,
+        child: Consumer<ReportViewModel>(
+          builder: (context, vmW, _) => AlertDialog(
             insetPadding: const EdgeInsets.all(20),
             backgroundColor: GlobalVariables.backgroundColor,
             shape: RoundedRectangleBorder(
@@ -1722,21 +1347,21 @@ class _ReportScreenState extends State<ReportScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     DropdownButtonFormField<Supplier>(
-                      value: selectedSupplier,
+                      value: vmW.selectedSupplier,
                       decoration: const InputDecoration(
                         labelText: "Supplier",
                         border: OutlineInputBorder(),
                       ),
-                      items: _suppliers
+                      items: vmW.suppliers
                           .map((s) => DropdownMenuItem(
                                 value: s,
                                 child: Text(s.name),
                               ))
                           .toList(),
                       onChanged: (value) {
-                        setDialogState(() {
-                          selectedSupplier = value;
-                        });
+                        if (value != null) {
+                          vm.setSelectedSupplier(value);
+                        }
                       },
                     ),
                     const SizedBox(height: 10),
@@ -1753,19 +1378,20 @@ class _ReportScreenState extends State<ReportScreen> {
                         final now = DateTime.now();
                         final picked = await showDatePicker(
                           context: context,
-                          initialDate: receiptDate ?? now,
+                          initialDate: vmW.addInvoiceDate ?? now,
                           firstDate: DateTime(2020, 1, 1),
                           lastDate: DateTime(now.year + 5, 12, 31),
                         );
                         if (picked != null) {
-                          setDialogState(() => receiptDate = picked);
+                          vm.setReceiptDate(picked);
                         }
                       },
                       icon: const Icon(Icons.date_range),
                       label: Text(
-                        receiptDate == null
+                        vmW.addInvoiceDate == null
                             ? "Pick Date"
-                            : DateFormat('yyyy-MM-dd').format(receiptDate!),
+                            : DateFormat('yyyy-MM-dd')
+                                .format(vmW.addInvoiceDate!),
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -1786,10 +1412,10 @@ class _ReportScreenState extends State<ReportScreen> {
                     ListView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
-                      itemCount: items.length,
+                      itemCount: vmW.items.length,
                       itemBuilder: (context, index) {
-                        final item = items[index];
-                        final units = unitsForProduct(item.productId);
+                        final item = vmW.items[index];
+                        final units = vmW.unitsForProduct(item.productId);
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Column(
@@ -1804,7 +1430,7 @@ class _ReportScreenState extends State<ReportScreen> {
                                         labelText: "Product",
                                         border: OutlineInputBorder(),
                                       ),
-                                      items: _products
+                                      items: vmW.products
                                           .map(
                                             (p) => DropdownMenuItem(
                                               value: p.id,
@@ -1812,16 +1438,8 @@ class _ReportScreenState extends State<ReportScreen> {
                                             ),
                                           )
                                           .toList(),
-                                      onChanged: (value) {
-                                        setDialogState(() {
-                                          item.productId = value;
-                                          final nextUnits =
-                                              unitsForProduct(value);
-                                          item.unitId = nextUnits.isNotEmpty
-                                              ? nextUnits.first.id
-                                              : null;
-                                        });
-                                      },
+                                      onChanged: (value) =>
+                                          vm.setProductForItem(index, value),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
@@ -1841,16 +1459,13 @@ class _ReportScreenState extends State<ReportScreen> {
                                             ),
                                           )
                                           .toList(),
-                                      onChanged: (value) {
-                                        setDialogState(() {
-                                          item.unitId = value;
-                                        });
-                                      },
+                                      onChanged: (value) =>
+                                          vm.setUnitForItem(index, value),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
                                   IconButton(
-                                    onPressed: () => removeItem(index),
+                                    onPressed: () => vm.removeItem(index),
                                     icon: const Icon(Icons.remove_circle),
                                     color: Colors.red,
                                   ),
@@ -1893,11 +1508,7 @@ class _ReportScreenState extends State<ReportScreen> {
                     Align(
                       alignment: Alignment.centerLeft,
                       child: TextButton.icon(
-                        onPressed: () {
-                          setDialogState(() {
-                            addItem();
-                          });
-                        },
+                        onPressed: vm.addItem,
                         icon: const Icon(Icons.add),
                         label: const Text("Add Item"),
                       ),
@@ -1908,58 +1519,53 @@ class _ReportScreenState extends State<ReportScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () {
+                  Navigator.pop(context, false);
+                },
                 child: const Text("Cancel"),
               ),
               ElevatedButton(
-                onPressed: submit,
+                onPressed: () async {
+                  final ok = await vm.submitProduct(
+                    context,
+                    receiptNoCtrl.text,
+                    noteCtrl.text,
+                  );
+                  if (!mounted) return;
+                  if (ok) {
+                    showSnackBar(
+                      context,
+                      "Receipt created",
+                      bgColor: Colors.green,
+                    );
+                    Navigator.pop(context, true);
+                  } else {
+                    showSnackBar(
+                      context,
+                      "Failed to create receipt. Check supplier/date/items.",
+                      bgColor: Colors.red,
+                    );
+                  }
+                },
                 child: const Text("Save"),
               ),
             ],
-          );
-        },
+          ),
+        ),
       ),
     );
 
-    for (final item in items) {
-      item.dispose();
-    }
+    await Future.delayed(const Duration(milliseconds: 350));
+    vm.clearAddInvoiceDraft();
+    receiptNoCtrl.dispose();
+    noteCtrl.dispose();
   }
 
-  Future<void> _showPurchasedReceiptDialog(int receiptId) async {
-    bool isLoading = true;
-    String? error;
-    PurchasedReceipt? detail;
-
-    if (!mounted) return;
+  Future<void> _showPurchasedReceiptDialog() async {
+    final vm = context.read<ReportViewModel>();
     await showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          Future<void> load() async {
-            try {
-              final data = await _reportServices.fetchPurchasedReceiptDetail(
-                context: context,
-                id: receiptId,
-              );
-              if (!mounted) return;
-              setDialogState(() {
-                detail = data;
-                isLoading = false;
-              });
-            } catch (e) {
-              if (!mounted) return;
-              setDialogState(() {
-                error = e.toString();
-                isLoading = false;
-              });
-            }
-          }
-
-          if (isLoading && detail == null && error == null) {
-            load();
-          }
-
+        context: context,
+        builder: (context) {
           return AlertDialog(
             insetPadding: const EdgeInsets.all(20),
             backgroundColor: GlobalVariables.backgroundColor,
@@ -1972,18 +1578,18 @@ class _ReportScreenState extends State<ReportScreen> {
             content: SizedBox(
               width: MediaQuery.of(context).size.width * 0.7,
               height: MediaQuery.of(context).size.height * 0.7,
-              child: isLoading
+              child: vm.isDetailLoading
                   ? const Center(child: CustomLoading())
-                  : error != null
+                  : vm.detailError != null
                       ? Center(
                           child: Text(
-                            error!,
+                            vm.detailError!,
                             style: const TextStyle(color: Colors.red),
                           ),
                         )
-                      : detail == null
+                      : vm.detail == null
                           ? const Center(child: Text("No detail found"))
-                          : _buildReceiptDetailBody(detail!),
+                          : _buildReceiptDetailBody(vm.detail!),
             ),
             actions: [
               TextButton(
@@ -1992,9 +1598,7 @@ class _ReportScreenState extends State<ReportScreen> {
               ),
             ],
           );
-        },
-      ),
-    );
+        });
   }
 
   Widget _buildReceiptDetailBody(PurchasedReceipt receipt) {
@@ -2535,16 +2139,4 @@ class _ProductSalesDataSource extends DataTableSource {
 
   @override
   int get selectedRowCount => 0;
-}
-
-class _ReceiptItemDraft {
-  int? productId;
-  int? unitId;
-  final TextEditingController qtyCtrl = TextEditingController();
-  final TextEditingController unitCostCtrl = TextEditingController();
-
-  void dispose() {
-    qtyCtrl.dispose();
-    unitCostCtrl.dispose();
-  }
 }

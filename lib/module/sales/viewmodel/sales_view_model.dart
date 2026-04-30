@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:smart_cashier_app/models/sales.dart';
 import 'package:smart_cashier_app/module/sales/services/sales_services.dart';
 
-class SalesVM extends ChangeNotifier {
+class SalesViewModel extends ChangeNotifier {
   final SalesServices salesServices;
 
-  SalesVM(this.salesServices);
+  SalesViewModel(this.salesServices);
 
   bool isLoading = true;
   List<Sales> salesList = [];

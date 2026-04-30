@@ -20,7 +20,7 @@ class _SalesState extends State<Sales> {
   // final SalesServices salesServices = SalesServices();
 
   Future<void> _confirmDeleteSales(sales_model.Sales sales) async {
-    final vm = context.read<SalesVM>();
+    final vm = context.read<SalesViewModel>();
     await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -50,6 +50,7 @@ class _SalesState extends State<Sales> {
   }
 
   void _showSalesDetailDialog(sales_model.Sales sales) {
+    final vm = context.read<SalesViewModel>();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -68,8 +69,7 @@ class _SalesState extends State<Sales> {
               ),
               const SizedBox(height: 12),
               Text('No. Nota: ${sales.id}'),
-              Text(
-                  'Date: ${context.read<SalesVM>().formatDate(sales.created_at)}'),
+              Text('Date: ${vm.formatDate(sales.created_at)}'),
               Text(
                   'Customer: ${sales.customer_name?.isNotEmpty == true ? sales.customer_name : '-'}'),
               Text(
@@ -128,15 +128,13 @@ class _SalesState extends State<Sales> {
                             cells: [
                               DataCell(Text(item.product_name ??
                                   'Product #${item.id_product}')),
-                              DataCell(Text(context
-                                  .read<SalesVM>()
-                                  .formatQty(item.quantity))),
+                              DataCell(Text(vm.formatQty(item.quantity))),
                               DataCell(Text(item.product_unit ??
                                   'Unit #${item.id_product_unit}')),
                               DataCell(Text(
                                   format.toRupiah(item.unit_price_snapshot))),
                               DataCell(Text(
-                                  "${context.read<SalesVM>().formatQty(item.discount_percent)} %")),
+                                  "${vm.formatQty(item.discount_percent)} %")),
                               DataCell(
                                   Text(format.toRupiah(item.discount_amount))),
                               DataCell(Text(format.toRupiah(item.sub_total))),
@@ -166,10 +164,9 @@ class _SalesState extends State<Sales> {
     super.initState();
     Future.microtask(
       () {
-        context.read<SalesVM>().fetchSales(context);
+        context.read<SalesViewModel>().fetchSales(context);
       },
     );
-    // _fetchSales();
   }
 
   @override
@@ -180,7 +177,7 @@ class _SalesState extends State<Sales> {
 
   @override
   Widget build(BuildContext context) {
-    final vm = context.read<SalesVM>();
+    final vm = context.read<SalesViewModel>();
     double screenSizeWidth = MediaQuery.of(context).size.width;
     bool isWideScreen = screenSizeWidth > 950;
     final filteredSales = vm.getFilteredSales();
@@ -238,7 +235,7 @@ class _SalesState extends State<Sales> {
     return TextField(
       controller: _searchNoteController,
       onChanged: (searchItem) =>
-          context.read<SalesVM>().setFilterQuery(searchQueryValue: searchItem),
+          context.read<SalesViewModel>().setFilterQuery(searchQueryValue: searchItem),
       decoration: const InputDecoration(
         labelText: "Search Note",
         border: OutlineInputBorder(),
@@ -248,7 +245,7 @@ class _SalesState extends State<Sales> {
   }
 
   Widget _buildProductFilters() {
-    final vm = context.watch<SalesVM>();
+    final vm = context.watch<SalesViewModel>();
     return Container(
       width: MediaQuery.of(context).size.width,
       child: Wrap(
@@ -305,7 +302,7 @@ class _SalesState extends State<Sales> {
           ),
           OutlinedButton.icon(
             onPressed: () {
-              context.read<SalesVM>().resetTableFilters();
+              context.read<SalesViewModel>().resetTableFilters();
               _searchNoteController.clear();
             },
             icon: const Icon(Icons.restart_alt),
@@ -317,7 +314,7 @@ class _SalesState extends State<Sales> {
   }
 
   Widget _buildSalesTable(List<sales_model.Sales> list) {
-    final vm = context.watch<SalesVM>();
+    final vm = context.watch<SalesViewModel>();
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -405,7 +402,7 @@ class _SalesState extends State<Sales> {
                                     ),
                                   );
                                   if (isUpdated == true && mounted) {
-                                    context.read<SalesVM>().fetchSales(context);
+                                    context.read<SalesViewModel>().fetchSales(context);
                                     // _fetchSales();
                                   }
                                 },
